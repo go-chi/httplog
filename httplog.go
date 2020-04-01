@@ -47,7 +47,7 @@ func Handler(f middleware.LogFormatter) func(next http.Handler) http.Handler {
 			entry := f.NewLogEntry(r)
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
-			buf := newLimitBuffer(1024)
+			buf := newLimitBuffer(512)
 			ww.Tee(buf)
 
 			t1 := time.Now()
