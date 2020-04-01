@@ -11,7 +11,7 @@ import (
 func main() {
 	// Logger
 	logger := httplog.NewLogger("httplog-example", httplog.Options{
-		// JSON:    true,
+		// JSON: true,
 		Concise: true,
 		// Tags: map[string]string{
 		// 	"version": "v1.0-81aa4244d9fc8076a",

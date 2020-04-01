@@ -20,7 +20,7 @@ import (
 func main() {
   // Logger
   logger := httplog.NewLogger("httplog-example", httplog.Options{
-    JSON:    true,
+    JSON: true,
   })
 
   // Service
