@@ -3,6 +3,7 @@ package httplog
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -49,7 +50,7 @@ func Configure(opts Options) {
 	DefaultOptions = opts
 
 	// Config the zerolog global logger
-	logLevel, err := zerolog.ParseLevel(opts.LogLevel)
+	logLevel, err := zerolog.ParseLevel(strings.ToLower(opts.LogLevel))
 	if err != nil {
 		fmt.Printf("httplog: error! %v\n", err)
 		os.Exit(1)
