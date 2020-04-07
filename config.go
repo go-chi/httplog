@@ -57,7 +57,7 @@ func Configure(opts Options) {
 	}
 	zerolog.SetGlobalLevel(logLevel)
 
-	zerolog.LevelFieldName = "severity"
+	zerolog.LevelFieldName = "level"
 	zerolog.TimestampFieldName = "timestamp"
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 
