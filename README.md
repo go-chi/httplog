@@ -14,7 +14,7 @@ import (
   "net/http"
   "github.com/go-chi/chi"
   "github.com/go-chi/chi/middleware"
-  "github.com/goware/httplog"
+  "github.com/go-chi/httplog"
 )
 
 func main() {
