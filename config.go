@@ -11,10 +11,11 @@ import (
 )
 
 var DefaultOptions = Options{
-	LogLevel: "info",
-	JSON:     false,
-	Concise:  false,
-	Tags:     nil,
+	LogLevel:    "info",
+	JSON:        false,
+	Concise:     false,
+	Tags:        nil,
+	SkipHeaders: nil,
 }
 
 type Options struct {
@@ -39,6 +40,9 @@ type Options struct {
 	// These can be useful for example the commit hash of a build, or an environment
 	// name like prod/stg/dev
 	Tags map[string]string
+
+	// SkipHeaders are additional headers which are redacted from the logs
+	SkipHeaders []string
 }
 
 // Configure will set new global/default options for the httplog and behaviour
@@ -47,6 +51,12 @@ func Configure(opts Options) {
 	if opts.LogLevel == "" {
 		opts.LogLevel = "info"
 	}
+
+	// Pre-downcase all SkipHeaders
+	for i, header := range opts.SkipHeaders {
+		opts.SkipHeaders[i] = strings.ToLower(header)
+	}
+
 	DefaultOptions = opts
 
 	// Config the zerolog global logger

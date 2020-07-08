@@ -182,6 +182,13 @@ func headerLogField(header http.Header) map[string]string {
 		if k == "authorization" || k == "cookie" || k == "set-cookie" {
 			headerField[k] = "***"
 		}
+
+		for _, skip := range DefaultOptions.SkipHeaders {
+			if k == skip {
+				headerField[k] = "***"
+				break
+			}
+		}
 	}
 	return headerField
 }
