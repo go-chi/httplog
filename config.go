@@ -32,7 +32,7 @@ type Options struct {
 	JSON bool
 
 	// Concise mode includes fewer log details during the request flow. For example
-	// exluding details like request content length, user-agent and other details.
+	// excluding details like request content length, user-agent and other details.
 	// This is useful if during development your console is too noisy.
 	Concise bool
 

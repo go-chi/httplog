@@ -31,7 +31,7 @@ func NewLogger(serviceName string, opts ...Options) zerolog.Logger {
 
 // RequestLogger is an http middleware to log http requests and responses.
 //
-// NOTE: for simplicty, RequestLogger automatically makes use of the chi RequestID and
+// NOTE: for simplicity, RequestLogger automatically makes use of the chi RequestID and
 // Recoverer middleware.
 func RequestLogger(logger zerolog.Logger) func(next http.Handler) http.Handler {
 	return chi.Chain(
