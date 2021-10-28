@@ -11,11 +11,12 @@ import (
 )
 
 var DefaultOptions = Options{
-	LogLevel:    "info",
-	JSON:        false,
-	Concise:     false,
-	Tags:        nil,
-	SkipHeaders: nil,
+	LogLevel:       "info",
+	LevelFieldName: "level",
+	JSON:           false,
+	Concise:        false,
+	Tags:           nil,
+	SkipHeaders:    nil,
 }
 
 type Options struct {
@@ -23,6 +24,10 @@ type Options struct {
 	//
 	// Must be one of: ["trace", "debug", "info", "warn", "error", "critical"]
 	LogLevel string
+
+	// LevelFieldName sets the field name for the log level or severity.
+	// Some providers parse and search for different field names.
+	LevelFieldName string
 
 	// JSON enables structured logging output in json. Make sure to enable this
 	// in production mode so log aggregators can receive data in parsable format.
@@ -52,6 +57,10 @@ func Configure(opts Options) {
 		opts.LogLevel = "info"
 	}
 
+	if opts.LevelFieldName == "" {
+		opts.LevelFieldName = "level"
+	}
+
 	// Pre-downcase all SkipHeaders
 	for i, header := range opts.SkipHeaders {
 		opts.SkipHeaders[i] = strings.ToLower(header)
@@ -67,7 +76,7 @@ func Configure(opts Options) {
 	}
 	zerolog.SetGlobalLevel(logLevel)
 
-	zerolog.LevelFieldName = "level"
+	zerolog.LevelFieldName = strings.ToLower(opts.LevelFieldName)
 	zerolog.TimestampFieldName = "timestamp"
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 
