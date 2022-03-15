@@ -232,7 +232,11 @@ func statusLabel(status int) string {
 
 func LogEntry(ctx context.Context) zerolog.Logger {
 	entry := ctx.Value(middleware.LogEntryCtxKey).(*RequestLoggerEntry)
-	return entry.Logger
+	if entry == nil {
+		return zerolog.Nop()
+	} else {
+		return entry.Logger
+	}
 }
 
 func LogEntrySetField(ctx context.Context, key, value string) {
