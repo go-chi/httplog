@@ -231,8 +231,8 @@ func statusLabel(status int) string {
 // with a call to .Print(), .Info(), etc.
 
 func LogEntry(ctx context.Context) zerolog.Logger {
-	entry := ctx.Value(middleware.LogEntryCtxKey).(*RequestLoggerEntry)
-	if entry == nil {
+	entry, ok := ctx.Value(middleware.LogEntryCtxKey).(*RequestLoggerEntry)
+	if !ok || entry == nil {
 		return zerolog.Nop()
 	} else {
 		return entry.Logger
