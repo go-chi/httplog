@@ -1,11 +1,10 @@
-httplog
-=======
+# httplog
 
-Small but powerful structured logging package for HTTP request logging in Go.
+Small but powerful wrapper around [Zerlog](https://github.com/rs/zerolog) to provide structured logging package for HTTP request logging in Go.
 
 ## Example
 
-(see [_example/](./_example/main.go))
+(see [\_example/](./_example/main.go))
 
 ```go
 package main

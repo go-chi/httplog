@@ -73,9 +73,9 @@ type requestLogger struct {
 func (l *requestLogger) NewLogEntry(r *http.Request) middleware.LogEntry {
 	entry := &RequestLoggerEntry{}
 	msg := fmt.Sprintf("Request: %s %s", r.Method, r.URL.Path)
-	entry.Logger = l.Logger.With().Fields(requestLogFields(r, true)).Logger()
+	entry.Logger = l.Logger.With().Fields(requestLogFields(r)).Logger()
 	if !DefaultOptions.Concise {
-		entry.Logger.Info().Fields(requestLogFields(r, DefaultOptions.Concise)).Msgf(msg)
+		entry.Logger.Info().Msgf(msg)
 	}
 	return entry
 }
@@ -132,7 +132,7 @@ func (l *RequestLoggerEntry) Panic(v interface{}, stack []byte) {
 	}
 }
 
-func requestLogFields(r *http.Request, concise bool) map[string]interface{} {
+func requestLogFields(r *http.Request) map[string]interface{} {
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
@@ -148,12 +148,6 @@ func requestLogFields(r *http.Request, concise bool) map[string]interface{} {
 	}
 	if reqID := middleware.GetReqID(r.Context()); reqID != "" {
 		requestFields["requestID"] = reqID
-	}
-
-	if concise {
-		return map[string]interface{}{
-			"httpRequest": requestFields,
-		}
 	}
 
 	requestFields["scheme"] = scheme
