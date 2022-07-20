@@ -99,6 +99,6 @@ func Configure(opts Options) {
 	zerolog.TimeFieldFormat = opts.TimeFieldFormat
 
 	if !opts.JSON {
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: opts.LevelFieldName})
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: opts.TimeFieldFormat})
 	}
 }
