@@ -1,4 +1,4 @@
-package httplog
+package httplogx
 
 import (
 	"context"
