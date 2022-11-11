@@ -11,38 +11,32 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
-func NewLogger(serviceName string, opts ...Options) zerolog.Logger {
+func newRequestLogger(logger zerolog.Logger, opts ...Options) *requestLogger {
+	reqLogger := requestLogger{
+		Logger: logger,
+	}
 	if len(opts) > 0 {
-		Configure(opts[0])
-	} else {
-		Configure(DefaultOptions)
+		reqLogger.opts = Configure(opts[0])
 	}
-	logger := log.With().Str("service", strings.ToLower(serviceName))
-	if !DefaultOptions.Concise && len(DefaultOptions.Tags) > 0 {
-		logger = logger.Fields(map[string]interface{}{
-			"tags": DefaultOptions.Tags,
-		})
-	}
-	return logger.Logger()
+	return &reqLogger
 }
 
 // RequestLogger is an http middleware to log http requests and responses.
 //
 // NOTE: for simplicity, RequestLogger automatically makes use of the chi RequestID and
 // Recoverer middleware.
-func RequestLogger(logger zerolog.Logger) func(next http.Handler) http.Handler {
+func RequestLogger(logger zerolog.Logger, opts ...Options) func(next http.Handler) http.Handler {
 	return chi.Chain(
 		middleware.RequestID,
-		Handler(logger),
+		Handler(logger, opts...),
 		middleware.Recoverer,
 	).Handler
 }
 
-func Handler(logger zerolog.Logger) func(next http.Handler) http.Handler {
-	var f middleware.LogFormatter = &requestLogger{logger}
+func Handler(logger zerolog.Logger, opts ...Options) func(next http.Handler) http.Handler {
+	var f middleware.LogFormatter = newRequestLogger(logger, opts...)
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			entry := f.NewLogEntry(r)
@@ -68,14 +62,15 @@ func Handler(logger zerolog.Logger) func(next http.Handler) http.Handler {
 
 type requestLogger struct {
 	Logger zerolog.Logger
+	opts   Options
 }
 
 func (l *requestLogger) NewLogEntry(r *http.Request) middleware.LogEntry {
 	entry := &RequestLoggerEntry{}
 	msg := fmt.Sprintf("Request: %s %s", r.Method, r.URL.Path)
-	entry.Logger = l.Logger.With().Fields(requestLogFields(r, true)).Logger()
-	if !DefaultOptions.Concise {
-		entry.Logger.Info().Fields(requestLogFields(r, DefaultOptions.Concise)).Msgf(msg)
+	entry.Logger = l.Logger.With().Fields(requestLogFields(r, true, l.opts.SkipHeaders)).Logger()
+	if l.opts.Concise {
+		entry.Logger.Info().Fields(requestLogFields(r, l.opts.Concise, l.opts.SkipHeaders)).Msgf(msg)
 	}
 	return entry
 }
@@ -83,6 +78,7 @@ func (l *requestLogger) NewLogEntry(r *http.Request) middleware.LogEntry {
 type RequestLoggerEntry struct {
 	Logger zerolog.Logger
 	msg    string
+	opts   Options
 }
 
 func (l *RequestLoggerEntry) Write(status, bytes int, header http.Header, elapsed time.Duration, extra interface{}) {
@@ -97,7 +93,7 @@ func (l *RequestLoggerEntry) Write(status, bytes int, header http.Header, elapse
 		"elapsed": float64(elapsed.Nanoseconds()) / 1000000.0, // in milliseconds
 	}
 
-	if !DefaultOptions.Concise {
+	if l.opts.Concise {
 		// Include response header, as well for error status codes (>400) we include
 		// the response body so we may inspect the log message sent back to the client.
 		if status >= 400 {
@@ -105,7 +101,7 @@ func (l *RequestLoggerEntry) Write(status, bytes int, header http.Header, elapse
 			responseLog["body"] = string(body)
 		}
 		if len(header) > 0 {
-			responseLog["header"] = headerLogField(header)
+			responseLog["header"] = headerLogField(header, l.opts.SkipHeaders)
 		}
 	}
 
@@ -116,7 +112,7 @@ func (l *RequestLoggerEntry) Write(status, bytes int, header http.Header, elapse
 
 func (l *RequestLoggerEntry) Panic(v interface{}, stack []byte) {
 	stacktrace := "#"
-	if DefaultOptions.JSON {
+	if l.opts.JSON {
 		stacktrace = string(stack)
 	}
 
@@ -127,12 +123,12 @@ func (l *RequestLoggerEntry) Panic(v interface{}, stack []byte) {
 
 	l.msg = fmt.Sprintf("%+v", v)
 
-	if !DefaultOptions.JSON {
+	if !l.opts.JSON {
 		middleware.PrintPrettyStack(v)
 	}
 }
 
-func requestLogFields(r *http.Request, concise bool) map[string]interface{} {
+func requestLogFields(r *http.Request, concise bool, skipHeaders []string) map[string]interface{} {
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
@@ -159,7 +155,7 @@ func requestLogFields(r *http.Request, concise bool) map[string]interface{} {
 	requestFields["scheme"] = scheme
 
 	if len(r.Header) > 0 {
-		requestFields["header"] = headerLogField(r.Header)
+		requestFields["header"] = headerLogField(r.Header, skipHeaders)
 	}
 
 	return map[string]interface{}{
@@ -167,7 +163,7 @@ func requestLogFields(r *http.Request, concise bool) map[string]interface{} {
 	}
 }
 
-func headerLogField(header http.Header) map[string]string {
+func headerLogField(header http.Header, skipList []string) map[string]string {
 	headerField := map[string]string{}
 	for k, v := range header {
 		k = strings.ToLower(k)
@@ -183,7 +179,7 @@ func headerLogField(header http.Header) map[string]string {
 			headerField[k] = "***"
 		}
 
-		for _, skip := range DefaultOptions.SkipHeaders {
+		for _, skip := range skipList {
 			if k == skip {
 				headerField[k] = "***"
 				break

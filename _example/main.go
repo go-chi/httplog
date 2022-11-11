@@ -2,26 +2,29 @@ package main
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httplog"
+	"github.com/rs/zerolog"
 )
 
 func main() {
-	// Logger
-	logger := httplog.NewLogger("httplog-example", httplog.Options{
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	// Options
+	options := httplog.Options{
 		// JSON: true,
 		Concise: true,
-		// Tags: map[string]string{
-		// 	"version": "v1.0-81aa4244d9fc8076a",
-		// 	"env":     "dev",
+		// SkipHeaders: []string{
+		// 	"proto",
+		//	"remoteIP",
 		// },
-	})
+	}
 
 	// Service
 	r := chi.NewRouter()
-	r.Use(httplog.RequestLogger(logger))
+	r.Use(httplog.RequestLogger(logger, options))
 	r.Use(middleware.Heartbeat("/ping"))
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
