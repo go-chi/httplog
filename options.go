@@ -1,17 +1,15 @@
 package httplog
 
 import (
-	"fmt"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
+	"golang.org/x/exp/slog"
 )
 
 var DefaultOptions = Options{
-	LogLevel:        "info",
+	LogLevel:        slog.LevelInfo,
 	LevelFieldName:  "level",
 	JSON:            false,
 	Concise:         false,
@@ -23,9 +21,9 @@ var DefaultOptions = Options{
 
 type Options struct {
 	// LogLevel defines the minimum level of severity that app should log.
-	//
-	// Must be one of: ["trace", "debug", "info", "warn", "error", "critical"]
-	LogLevel string
+	// Must be one of:
+	// slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError
+	LogLevel slog.Level
 
 	// LevelFieldName sets the field name for the log level or severity.
 	// Some providers parse and search for different field names.
@@ -63,9 +61,8 @@ type Options struct {
 // Configure will set new global/default options for the httplog and behaviour
 // of underlying zerolog pkg and its global logger.
 func Configure(opts Options) {
-	if opts.LogLevel == "" {
-		opts.LogLevel = "info"
-	}
+	// if opts.LogLevel is not set
+	// it would be 0 which is LevelInfo
 
 	if opts.LevelFieldName == "" {
 		opts.LevelFieldName = "level"
@@ -86,19 +83,29 @@ func Configure(opts Options) {
 
 	DefaultOptions = opts
 
-	// Config the zerolog global logger
-	logLevel, err := zerolog.ParseLevel(strings.ToLower(opts.LogLevel))
-	if err != nil {
-		fmt.Printf("httplog: error! %v\n", err)
-		os.Exit(1)
+	// zerolog.LevelFieldName = strings.ToLower(opts.LevelFieldName)
+	// zerolog.TimestampFieldName = strings.ToLower(opts.TimeFieldName)
+	// zerolog.TimeFieldFormat = opts.TimeFieldFormat
+	handlerOpts := &slog.HandlerOptions{
+		AddSource: true,
+		Level:     opts.LogLevel,
+		// TODO: add replace attr func to change default field names
+		// ReplaceAttr: func(attr slog.Attr) slog.Attr ,
 	}
-	zerolog.SetGlobalLevel(logLevel)
-
-	zerolog.LevelFieldName = strings.ToLower(opts.LevelFieldName)
-	zerolog.TimestampFieldName = strings.ToLower(opts.TimeFieldName)
-	zerolog.TimeFieldFormat = opts.TimeFieldFormat
-
 	if !opts.JSON {
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: opts.TimeFieldFormat})
+		slog.SetDefault(slog.New(handlerOpts.NewTextHandler(os.Stderr)))
+		// log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: opts.TimeFieldFormat})
+	} else {
+		slog.SetDefault(slog.New(handlerOpts.NewJSONHandler(os.Stderr)))
 	}
 }
+
+// func replaceAttrs(groups []string, a slog.Attr) slog.Attr {
+// 	if a.Kind == slog.GroupKind {
+// 		return slog.Attr{
+// 			Kind: slog.GroupKind,
+// 			Val:  strings.Join(groups, "."),
+// 		}
+// 	}
+// 	return a
+// }
