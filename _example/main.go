@@ -34,9 +34,9 @@ func main() {
 	})
 
 	r.Get("/info", func(w http.ResponseWriter, r *http.Request) {
-		// oplog := httplog.LogEntry(r.Context())
+		oplog := httplog.LogEntry(r.Context())
 		w.Header().Add("Content-Type", "text/plain")
-		// oplog.Info("info here")
+		oplog.Info("info here")
 		w.Write([]byte("info here"))
 	})
 
