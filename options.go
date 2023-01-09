@@ -15,6 +15,8 @@ var DefaultOptions = Options{
 	Concise:         false,
 	Tags:            nil,
 	SkipHeaders:     nil,
+	QuietDownRoutes: nil,
+	QuietDownPeriod: 0,
 	TimeFieldFormat: time.RFC3339Nano,
 	TimeFieldName:   "timestamp",
 }
@@ -49,6 +51,15 @@ type Options struct {
 	// SkipHeaders are additional headers which are redacted from the logs
 	SkipHeaders []string
 
+	// QuietDownRoutes are routes which are temporarily excluded from logging for a QuietDownPeriod after it occurs
+	// for the first time
+	// to cancel noise from logging for routes that are known to be noisy.
+	QuietDownRoutes []string
+
+	// QuietDownPeriod is the duration for which a route is excluded from logging after it occurs for the first time
+	// if the route is in QuietDownRoutes
+	QuietDownPeriod time.Duration
+
 	// TimeFieldFormat defines the time format of the Time field, defaulting to "time.RFC3339Nano" see options at:
 	// https://pkg.go.dev/time#pkg-constants
 	TimeFieldFormat string
@@ -74,6 +85,12 @@ func Configure(opts Options) {
 
 	if opts.TimeFieldName == "" {
 		opts.TimeFieldName = "timestamp"
+	}
+
+	if len(opts.QuietDownRoutes) > 0 {
+		if opts.QuietDownPeriod == 0 {
+			opts.QuietDownPeriod = 5 * time.Minute
+		}
 	}
 
 	// Pre-downcase all SkipHeaders

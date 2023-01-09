@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -65,7 +66,11 @@ func Handler(logger *slog.Logger, optSkipPaths ...[]string) func(next http.Handl
 				}
 			}
 
-			// Log the request
+			if rInCooldown(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			entry := f.NewLogEntry(r)
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
@@ -150,6 +155,40 @@ func (l *RequestLoggerEntry) Panic(v interface{}, stack []byte) {
 	if !DefaultOptions.JSON {
 		middleware.PrintPrettyStack(v)
 	}
+}
+
+var coolDownMu sync.RWMutex
+var coolDowns = map[string]time.Time{}
+
+func rInCooldown(r *http.Request) bool {
+	routePath := r.URL.EscapedPath()
+	if routePath == "" {
+		routePath = "/"
+	}
+	if !inArray(DefaultOptions.QuietDownRoutes, routePath) {
+		return false
+	}
+	coolDownMu.RLock()
+	coolDownTime, ok := coolDowns[routePath]
+	coolDownMu.RUnlock()
+	if ok {
+		if time.Since(coolDownTime) < DefaultOptions.QuietDownPeriod {
+			return true
+		}
+	}
+	coolDownMu.Lock()
+	defer coolDownMu.Unlock()
+	coolDowns[routePath] = time.Now().Add(DefaultOptions.QuietDownPeriod)
+	return false
+}
+
+func inArray(arr []string, val string) bool {
+	for _, v := range arr {
+		if v == val {
+			return true
+		}
+	}
+	return false
 }
 
 func requestLogFields(r *http.Request, concise bool) slog.Attr {
