@@ -118,7 +118,7 @@ func Configure(opts Options) {
 	}
 
 	if !opts.JSON {
-		slog.SetDefault(slog.New(NewPrettyHandler(os.Stderr, handlerOpts)))
+		slog.SetDefault(slog.New(NewPrettyHandler(os.Stdout, handlerOpts)))
 	} else {
 		slog.SetDefault(slog.New(handlerOpts.NewJSONHandler(os.Stderr)))
 	}
