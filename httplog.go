@@ -3,7 +3,7 @@ package httplog
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -81,7 +81,7 @@ func Handler(logger *slog.Logger, optSkipPaths ...[]string) func(next http.Handl
 			defer func() {
 				var respBody []byte
 				if ww.Status() >= 400 {
-					respBody, _ = ioutil.ReadAll(buf)
+					respBody, _ = io.ReadAll(buf)
 				}
 				entry.Write(ww.Status(), ww.BytesWritten(), ww.Header(), time.Since(t1), respBody)
 			}()
