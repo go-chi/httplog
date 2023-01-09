@@ -83,29 +83,26 @@ func Configure(opts Options) {
 
 	DefaultOptions = opts
 
-	// zerolog.LevelFieldName = strings.ToLower(opts.LevelFieldName)
-	// zerolog.TimestampFieldName = strings.ToLower(opts.TimeFieldName)
-	// zerolog.TimeFieldFormat = opts.TimeFieldFormat
-	handlerOpts := &slog.HandlerOptions{
-		AddSource: true,
-		Level:     opts.LogLevel,
-		// TODO: add replace attr func to change default field names
-		// ReplaceAttr: func(attr slog.Attr) slog.Attr ,
+	replaceAttrs := func(_ []string, a slog.Attr) slog.Attr {
+		switch a.Key {
+		case slog.LevelKey:
+			a.Key = opts.LevelFieldName
+		case slog.TimeKey:
+			a.Key = opts.TimeFieldName
+			a.Value = slog.StringValue(a.Value.Time().Format(opts.TimeFieldFormat))
+		}
+		return a
 	}
+
+	handlerOpts := &slog.HandlerOptions{
+		AddSource:   true,
+		Level:       opts.LogLevel,
+		ReplaceAttr: replaceAttrs,
+	}
+
 	if !opts.JSON {
-		slog.SetDefault(slog.New(handlerOpts.NewTextHandler(os.Stderr)))
-		// log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: opts.TimeFieldFormat})
+		slog.SetDefault(slog.New(NewPrettyHandler(os.Stderr, handlerOpts)))
 	} else {
 		slog.SetDefault(slog.New(handlerOpts.NewJSONHandler(os.Stderr)))
 	}
 }
-
-// func replaceAttrs(groups []string, a slog.Attr) slog.Attr {
-// 	if a.Kind == slog.GroupKind {
-// 		return slog.Attr{
-// 			Kind: slog.GroupKind,
-// 			Val:  strings.Join(groups, "."),
-// 		}
-// 	}
-// 	return a
-// }
