@@ -19,7 +19,6 @@ var DefaultOptions = Options{
 	QuietDownPeriod: 0,
 	TimeFieldFormat: time.RFC3339Nano,
 	TimeFieldName:   "timestamp",
-	SourceFieldName: nil,
 }
 
 type Options struct {
@@ -71,8 +70,8 @@ type Options struct {
 
 	// SourceFieldName sets the field name for the source field which logs
 	// the location where the logger was called
-	// its nil if not enabled
-	SourceFieldName *string
+	// its "" if not enabled
+	SourceFieldName string
 }
 
 // Configure will set new global/default options for the httplog and behaviour
@@ -107,7 +106,7 @@ func Configure(opts Options) {
 	DefaultOptions = opts
 
 	var addSource bool
-	if opts.SourceFieldName != nil {
+	if opts.SourceFieldName != "" {
 		addSource = true
 	}
 
@@ -119,8 +118,8 @@ func Configure(opts Options) {
 			a.Key = opts.TimeFieldName
 			a.Value = slog.StringValue(a.Value.Time().Format(opts.TimeFieldFormat))
 		case slog.SourceKey:
-			if opts.SourceFieldName != nil {
-				a.Key = *opts.SourceFieldName
+			if opts.SourceFieldName != "" {
+				a.Key = opts.SourceFieldName
 			}
 		}
 		return a
