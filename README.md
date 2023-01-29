@@ -75,4 +75,4 @@ This package is a modified version of [go-chi/httplog](https://github.com/go-chi
 [MIT](/LICENSE)
 
 NOTE: This is a derivative package of `go-chi/httplog`. Refer to the [NOTICE file](/NOTICE) for the license of the
-source material.
+original source material.
