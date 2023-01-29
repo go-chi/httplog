@@ -1,7 +1,8 @@
-httplog
+httpzaplog
 =======
 
-Small but powerful structured logging package for HTTP request logging in Go.
+A fork of [go-chi/httplog](https://github.com/go-chi/httplog) that uses [uber-go/zap](https://github.com/uber-go/zap)
+for logging instead of `zerolog`.
 
 ## Example
 
@@ -61,6 +62,11 @@ func main() {
 }
 
 ```
+
+## Credits
+
+This package is a modified version of [go-chi/httplog](https://github.com/go-chi/httplog).
+
 
 ## License
 
