@@ -15,9 +15,17 @@ import (
 )
 
 type Options struct {
-	Logger      *zap.Logger
-	Concise     bool
+	Logger *zap.Logger
+
+	// Concise determines Whether to log the entries in concise mode.
+	Concise bool
+
+	// SkipHeaders determines which headers shouldn't be logged.
 	SkipHeaders []string
+
+	// ErrorMiddleware is a middleware that will be injected between the logger middleware and the Recoverer middleware.
+	// This allows you to customize the 500 error page in the case of a panic.
+	ErrorMiddleware func(http.Handler) http.Handler
 }
 
 var DefaultOptions = Options{
@@ -33,11 +41,15 @@ func RequestLogger(opts *Options) func(next http.Handler) http.Handler {
 	if opts == nil {
 		opts = &DefaultOptions
 	}
-	return chi.Chain(
+	chain := []func(http.Handler) http.Handler{
 		middleware.RequestID,
 		Handler(opts),
-		middleware.Recoverer,
-	).Handler
+	}
+	if opts.ErrorMiddleware != nil {
+		chain = append(chain, opts.ErrorMiddleware)
+	}
+	chain = append(chain, middleware.Recoverer)
+	return chi.Chain(chain...).Handler
 }
 
 func Handler(opts *Options) func(next http.Handler) http.Handler {
