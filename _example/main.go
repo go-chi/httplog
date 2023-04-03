@@ -21,7 +21,7 @@ func main() {
 
 	// Service
 	r := chi.NewRouter()
-	r.Use(httplog.RequestLogger(logger))
+	r.Use(httplog.RequestLogger(logger, []string{"/ping"}))
 	r.Use(middleware.Heartbeat("/ping"))
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {

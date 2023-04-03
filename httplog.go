@@ -33,18 +33,36 @@ func NewLogger(serviceName string, opts ...Options) zerolog.Logger {
 //
 // NOTE: for simplicity, RequestLogger automatically makes use of the chi RequestID and
 // Recoverer middleware.
-func RequestLogger(logger zerolog.Logger) func(next http.Handler) http.Handler {
+func RequestLogger(logger zerolog.Logger, skipPaths ...[]string) func(next http.Handler) http.Handler {
 	return chi.Chain(
 		middleware.RequestID,
-		Handler(logger),
+		Handler(logger, skipPaths...),
 		middleware.Recoverer,
 	).Handler
 }
 
-func Handler(logger zerolog.Logger) func(next http.Handler) http.Handler {
+func Handler(logger zerolog.Logger, optSkipPaths ...[]string) func(next http.Handler) http.Handler {
 	var f middleware.LogFormatter = &requestLogger{logger}
+
+	skipPaths := map[string]struct{}{}
+	if len(optSkipPaths) > 0 {
+		for _, path := range optSkipPaths[0] {
+			skipPaths[path] = struct{}{}
+		}
+	}
+
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
+			// Skip the logger if the path is in the skip list
+			if len(skipPaths) > 0 {
+				_, skip := skipPaths[r.URL.Path]
+				if skip {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			// Log the request
 			entry := f.NewLogEntry(r)
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
