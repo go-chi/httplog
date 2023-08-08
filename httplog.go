@@ -10,9 +10,10 @@ import (
 	"sync"
 	"time"
 
+	"log/slog"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"golang.org/x/exp/slog"
 )
 
 func NewLogger(serviceName string, opts ...Options) *slog.Logger {
@@ -24,7 +25,7 @@ func NewLogger(serviceName string, opts ...Options) *slog.Logger {
 	logger := slog.With(slog.Attr{Key: "service", Value: slog.StringValue(strings.ToLower(serviceName))})
 	// logger := log.With().Str("service", strings.ToLower(serviceName))
 	if !DefaultOptions.Concise && len(DefaultOptions.Tags) > 0 {
-		group := []slog.Attr{}
+		group := []any{}
 		for k, v := range DefaultOptions.Tags {
 			group = append(group, slog.Attr{Key: k, Value: slog.StringValue(v)})
 		}
@@ -118,10 +119,10 @@ func (l *RequestLoggerEntry) Write(status, bytes int, header http.Header, elapse
 		msg = fmt.Sprintf("%s - %s", msg, l.msg)
 	}
 
-	responseLog := []slog.Attr{
-		{Key: "status", Value: slog.IntValue(status)},
-		{Key: "bytes", Value: slog.IntValue(bytes)},
-		{Key: "elapsed", Value: slog.Float64Value(float64(elapsed.Nanoseconds()) / 1000000.0)}, // in milliseconds
+	responseLog := []any{
+		slog.Attr{Key: "status", Value: slog.IntValue(status)},
+		slog.Attr{Key: "bytes", Value: slog.IntValue(bytes)},
+		slog.Attr{Key: "elapsed", Value: slog.Float64Value(float64(elapsed.Nanoseconds()) / 1000000.0)}, // in milliseconds
 	}
 
 	if !DefaultOptions.Concise {
@@ -132,10 +133,11 @@ func (l *RequestLoggerEntry) Write(status, bytes int, header http.Header, elapse
 			responseLog = append(responseLog, slog.Attr{Key: "body", Value: slog.StringValue(string(body))})
 		}
 		if len(header) > 0 {
-			responseLog = append(responseLog, slog.Group("header", headerLogField(header)...))
+			responseLog = append(responseLog, slog.Group("header", attrsToAnys(headerLogField(header))...))
 		}
 	}
-	l.Logger.With(slog.Group("httpResponse", responseLog...)).Log(statusLevel(status), msg)
+
+	l.Logger.With(slog.Group("httpResponse", responseLog...)).Log(context.Background(), statusLevel(status), msg)
 }
 
 func (l *RequestLoggerEntry) Panic(v interface{}, stack []byte) {
@@ -198,12 +200,12 @@ func requestLogFields(r *http.Request, concise bool) slog.Attr {
 	}
 	requestURL := fmt.Sprintf("%s://%s%s", scheme, r.Host, r.RequestURI)
 
-	requestFields := []slog.Attr{
-		{Key: "requestURL", Value: slog.StringValue(requestURL)},
-		{Key: "requestMethod", Value: slog.StringValue(r.Method)},
-		{Key: "requestPath", Value: slog.StringValue(r.URL.Path)},
-		{Key: "remoteIP", Value: slog.StringValue(r.RemoteAddr)},
-		{Key: "proto", Value: slog.StringValue(r.Proto)},
+	requestFields := []any{
+		slog.Attr{Key: "requestURL", Value: slog.StringValue(requestURL)},
+		slog.Attr{Key: "requestMethod", Value: slog.StringValue(r.Method)},
+		slog.Attr{Key: "requestPath", Value: slog.StringValue(r.URL.Path)},
+		slog.Attr{Key: "remoteIP", Value: slog.StringValue(r.RemoteAddr)},
+		slog.Attr{Key: "proto", Value: slog.StringValue(r.Proto)},
 	}
 	if reqID := middleware.GetReqID(r.Context()); reqID != "" {
 		requestFields = append(requestFields, slog.Attr{Key: "requestID", Value: slog.StringValue(reqID)})
@@ -260,6 +262,14 @@ func headerLogField(header http.Header) []slog.Attr {
 	return headerField
 }
 
+func attrsToAnys(attr []slog.Attr) []any {
+	attrs := make([]any, len(attr))
+	for i, a := range attr {
+		attrs[i] = a
+	}
+	return attrs
+}
+
 func statusLevel(status int) slog.Level {
 	switch {
 	case status <= 0:
@@ -307,7 +317,7 @@ func LogEntry(ctx context.Context) slog.Logger {
 			Level: slog.LevelError + 1,
 			// ReplaceAttr: func(attr slog.Attr) slog.Attr ,
 		}
-		return *slog.New(handlerOpts.NewTextHandler(os.Stdout))
+		return *slog.New(slog.NewTextHandler(os.Stdout, handlerOpts))
 	} else {
 		return entry.Logger
 	}

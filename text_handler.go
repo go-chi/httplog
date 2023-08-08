@@ -2,11 +2,13 @@ package httplog
 
 import (
 	"bytes"
+	"context"
 	"io"
+	"runtime"
 	"sync"
 	"time"
 
-	"golang.org/x/exp/slog"
+	"log/slog"
 )
 
 type PrettyHandler struct {
@@ -41,7 +43,7 @@ func NewPrettyHandler(w io.Writer, op ...*slog.HandlerOptions) *PrettyHandler {
 
 var _ slog.Handler = &PrettyHandler{}
 
-func (h *PrettyHandler) Enabled(level slog.Level) bool {
+func (h *PrettyHandler) Enabled(ctx context.Context, level slog.Level) bool {
 	minLevel := slog.LevelInfo
 	if h.opts.Level != nil {
 		minLevel = h.opts.Level.Level()
@@ -49,7 +51,7 @@ func (h *PrettyHandler) Enabled(level slog.Level) bool {
 	return level >= minLevel
 }
 
-func (h *PrettyHandler) Handle(r slog.Record) error {
+func (h *PrettyHandler) Handle(ctx context.Context, r slog.Record) error {
 	buf := &bytes.Buffer{}
 
 	if !r.Time.IsZero() {
@@ -78,8 +80,11 @@ func (h *PrettyHandler) Handle(r slog.Record) error {
 	buf.WriteString(" ")
 
 	if h.opts.AddSource {
-		file, line := r.SourceLine()
-		cW(buf, true, nGreen, "%s:%d", file, line)
+		s := source(r)
+		file := s.File
+		line := s.Line
+		function := s.Function
+		cW(buf, true, nGreen, "%s:%s:%d", function, file, line)
 		buf.WriteString(" ")
 	}
 
@@ -105,6 +110,16 @@ func (h *PrettyHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return h2
 }
 
+func source(r slog.Record) *slog.Source {
+	fs := runtime.CallersFrames([]uintptr{r.PC})
+	f, _ := fs.Next()
+	return &slog.Source{
+		Function: f.Function,
+		File:     f.File,
+		Line:     f.Line,
+	}
+}
+
 func writeAttrs(w *bytes.Buffer, attrs []slog.Attr, insideGroup bool) {
 	for i, attr := range attrs {
 		cW(w, true, nYellow, "%s: ", attr.Key)
@@ -121,21 +136,21 @@ func writeAttrValue(w *bytes.Buffer, value slog.Value, appendSpace bool) {
 		defer w.WriteString(" ")
 	}
 	switch v := value.Kind(); v {
-	case slog.StringKind:
+	case slog.KindString:
 		cW(w, true, nCyan, "%q", value.String())
-	case slog.BoolKind:
+	case slog.KindBool:
 		cW(w, true, nCyan, "%t", value.Bool())
-	case slog.Int64Kind:
+	case slog.KindInt64:
 		cW(w, true, nCyan, "%d", value.Int64())
-	case slog.DurationKind:
+	case slog.KindDuration:
 		cW(w, true, nCyan, "%s", value.Duration().String())
-	case slog.Float64Kind:
+	case slog.KindFloat64:
 		cW(w, true, nCyan, "%f", value.Float64())
-	case slog.TimeKind:
+	case slog.KindTime:
 		cW(w, true, nCyan, "%s", value.Time().Format(time.RFC3339))
-	case slog.Uint64Kind:
+	case slog.KindUint64:
 		cW(w, true, nCyan, "%d", value.Uint64())
-	case slog.GroupKind:
+	case slog.KindGroup:
 		cW(w, true, nWhite, "{")
 		writeAttrs(w, value.Group(), true)
 		cW(w, true, nWhite, "%s", "}")

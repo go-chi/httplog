@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/exp/slog"
+	"log/slog"
 )
 
 var DefaultOptions = Options{
@@ -134,6 +134,6 @@ func Configure(opts Options) {
 	if !opts.JSON {
 		slog.SetDefault(slog.New(NewPrettyHandler(os.Stdout, handlerOpts)))
 	} else {
-		slog.SetDefault(slog.New(handlerOpts.NewJSONHandler(os.Stderr)))
+		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, handlerOpts)))
 	}
 }
