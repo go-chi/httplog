@@ -1,4 +1,4 @@
-module github.com/go-chi/httplog
+module github.com/go-chi/httplog/v2
 
 go 1.21
 
