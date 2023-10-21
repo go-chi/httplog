@@ -8,7 +8,7 @@ import (
 	"log/slog"
 )
 
-var DefaultOptions = Options{
+var defaultOptions = Options{
 	LogLevel:           slog.LevelInfo,
 	LevelFieldName:     "level",
 	JSON:               false,
@@ -84,9 +84,9 @@ type Options struct {
 	SourceFieldName string
 }
 
-// Configure will set new global/default options for the httplog and behaviour
+// Configure will set new options for the httplog instance and behaviour
 // of underlying slog pkg and its global logger.
-func Configure(opts Options) {
+func (l *Logger) Configure(opts Options) {
 	// if opts.LogLevel is not set
 	// it would be 0 which is LevelInfo
 
@@ -113,7 +113,7 @@ func Configure(opts Options) {
 		opts.SkipRequestHeaders[i] = strings.ToLower(header)
 	}
 
-	DefaultOptions = opts
+	l.Options = opts
 
 	var addSource bool
 	if opts.SourceFieldName != "" {

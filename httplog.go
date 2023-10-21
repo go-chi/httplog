@@ -15,20 +15,30 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func NewLogger(serviceName string, opts ...Options) *slog.Logger {
-	if len(opts) > 0 {
-		Configure(opts[0])
+type Logger struct {
+	*slog.Logger
+	Options Options
+}
+
+func NewLogger(serviceName string, options ...Options) *Logger {
+	logger := &Logger{}
+	if len(options) > 0 {
+		logger.Configure(options[0])
 	} else {
-		Configure(DefaultOptions)
+		logger.Configure(defaultOptions)
 	}
-	logger := slog.With(slog.Attr{Key: "service", Value: slog.StringValue(serviceName)})
-	if !DefaultOptions.Concise && len(DefaultOptions.Tags) > 0 {
+
+	slogger := slog.With(slog.Attr{Key: "service", Value: slog.StringValue(serviceName)})
+
+	if !logger.Options.Concise && len(logger.Options.Tags) > 0 {
 		group := []any{}
-		for k, v := range DefaultOptions.Tags {
+		for k, v := range logger.Options.Tags {
 			group = append(group, slog.Attr{Key: k, Value: slog.StringValue(v)})
 		}
-		logger = logger.With(slog.Group("tags", group...))
+		slogger = slogger.With(slog.Group("tags", group...))
 	}
+
+	logger.Logger = slogger
 	return logger
 }
 
@@ -36,7 +46,7 @@ func NewLogger(serviceName string, opts ...Options) *slog.Logger {
 //
 // NOTE: for simplicity, RequestLogger automatically makes use of the chi RequestID and
 // Recoverer middleware.
-func RequestLogger(logger *slog.Logger, skipPaths ...[]string) func(next http.Handler) http.Handler {
+func RequestLogger(logger *Logger, skipPaths ...[]string) func(next http.Handler) http.Handler {
 	return chi.Chain(
 		middleware.RequestID,
 		Handler(logger, skipPaths...),
@@ -44,8 +54,8 @@ func RequestLogger(logger *slog.Logger, skipPaths ...[]string) func(next http.Ha
 	).Handler
 }
 
-func Handler(logger *slog.Logger, optSkipPaths ...[]string) func(next http.Handler) http.Handler {
-	var f middleware.LogFormatter = &requestLogger{*logger}
+func Handler(logger *Logger, optSkipPaths ...[]string) func(next http.Handler) http.Handler {
+	var f middleware.LogFormatter = &requestLogger{*logger.Logger, logger.Options}
 
 	skipPaths := map[string]struct{}{}
 	if len(optSkipPaths) > 0 {
@@ -65,7 +75,7 @@ func Handler(logger *slog.Logger, optSkipPaths ...[]string) func(next http.Handl
 				}
 			}
 
-			if rInCooldown(r) {
+			if rInCooldown(r, &logger.Options) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -92,30 +102,30 @@ func Handler(logger *slog.Logger, optSkipPaths ...[]string) func(next http.Handl
 }
 
 type requestLogger struct {
-	Logger slog.Logger
+	Logger  slog.Logger
+	Options Options
 }
 
 func (l *requestLogger) NewLogEntry(r *http.Request) middleware.LogEntry {
 	entry := &RequestLoggerEntry{}
 	msg := fmt.Sprintf("Request: %s %s", r.Method, r.URL.Path)
 
-	if DefaultOptions.RequestHeaders {
-		entry.Logger = *l.Logger.With(requestLogFields(r, DefaultOptions.Concise, true))
+	if l.Options.RequestHeaders {
+		entry.Logger = *l.Logger.With(requestLogFields(r, l.Options, true))
 	} else {
-		entry.Logger = *l.Logger.With(requestLogFields(r, false, false))
+		entry.Logger = *l.Logger.With(requestLogFields(r, l.Options, false))
 	}
 
-	// entry.Logger = *l.Logger.With(requestLogFields(r, true))
-	if !DefaultOptions.Concise {
-		// entry.Logger = *l.Logger.With(requestLogFields(r, DefaultOptions.Concise, DefaultOptions.RequestHeaders))
+	if !l.Options.Concise {
 		entry.Logger.Info(msg)
 	}
 	return entry
 }
 
 type RequestLoggerEntry struct {
-	Logger slog.Logger
-	msg    string
+	Logger  slog.Logger
+	Options Options
+	msg     string
 }
 
 func (l *RequestLoggerEntry) Write(status, bytes int, header http.Header, elapsed time.Duration, extra interface{}) {
@@ -130,7 +140,7 @@ func (l *RequestLoggerEntry) Write(status, bytes int, header http.Header, elapse
 		slog.Attr{Key: "elapsed", Value: slog.Float64Value(float64(elapsed.Nanoseconds()) / 1000000.0)}, // in milliseconds
 	}
 
-	if !DefaultOptions.Concise {
+	if !l.Options.Concise {
 		// Include response header, as well for error status codes (>400) we include
 		// the response body so we may inspect the log message sent back to the client.
 		if status >= 400 {
@@ -138,7 +148,7 @@ func (l *RequestLoggerEntry) Write(status, bytes int, header http.Header, elapse
 			responseLog = append(responseLog, slog.Attr{Key: "body", Value: slog.StringValue(string(body))})
 		}
 		if len(header) > 0 {
-			responseLog = append(responseLog, slog.Group("header", attrsToAnys(headerLogField(header))...))
+			responseLog = append(responseLog, slog.Group("header", attrsToAnys(headerLogField(header, l.Options))...))
 		}
 	}
 
@@ -147,7 +157,7 @@ func (l *RequestLoggerEntry) Write(status, bytes int, header http.Header, elapse
 
 func (l *RequestLoggerEntry) Panic(v interface{}, stack []byte) {
 	stacktrace := "#"
-	if DefaultOptions.JSON {
+	if l.Options.JSON {
 		stacktrace = string(stack)
 	}
 	l.Logger = *l.Logger.With(
@@ -161,7 +171,7 @@ func (l *RequestLoggerEntry) Panic(v interface{}, stack []byte) {
 
 	l.msg = fmt.Sprintf("%+v", v)
 
-	if !DefaultOptions.JSON {
+	if !l.Options.JSON {
 		middleware.PrintPrettyStack(v)
 	}
 }
@@ -169,25 +179,25 @@ func (l *RequestLoggerEntry) Panic(v interface{}, stack []byte) {
 var coolDownMu sync.RWMutex
 var coolDowns = map[string]time.Time{}
 
-func rInCooldown(r *http.Request) bool {
+func rInCooldown(r *http.Request, options *Options) bool {
 	routePath := r.URL.EscapedPath()
 	if routePath == "" {
 		routePath = "/"
 	}
-	if !inArray(DefaultOptions.QuietDownRoutes, routePath) {
+	if !inArray(options.QuietDownRoutes, routePath) {
 		return false
 	}
 	coolDownMu.RLock()
 	coolDownTime, ok := coolDowns[routePath]
 	coolDownMu.RUnlock()
 	if ok {
-		if time.Since(coolDownTime) < DefaultOptions.QuietDownPeriod {
+		if time.Since(coolDownTime) < options.QuietDownPeriod {
 			return true
 		}
 	}
 	coolDownMu.Lock()
 	defer coolDownMu.Unlock()
-	coolDowns[routePath] = time.Now().Add(DefaultOptions.QuietDownPeriod)
+	coolDowns[routePath] = time.Now().Add(options.QuietDownPeriod)
 	return false
 }
 
@@ -200,7 +210,7 @@ func inArray(arr []string, val string) bool {
 	return false
 }
 
-func requestLogFields(r *http.Request, concise bool, requestHeaders bool) slog.Attr {
+func requestLogFields(r *http.Request, options Options, requestHeaders bool) slog.Attr {
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
@@ -208,9 +218,9 @@ func requestLogFields(r *http.Request, concise bool, requestHeaders bool) slog.A
 	requestURL := fmt.Sprintf("%s://%s%s", scheme, r.Host, r.RequestURI)
 
 	requestFields := []any{
-		slog.Attr{Key: "requestURL", Value: slog.StringValue(requestURL)},
-		slog.Attr{Key: "requestMethod", Value: slog.StringValue(r.Method)},
-		slog.Attr{Key: "requestPath", Value: slog.StringValue(r.URL.Path)},
+		slog.Attr{Key: "url", Value: slog.StringValue(requestURL)},
+		slog.Attr{Key: "method", Value: slog.StringValue(r.Method)},
+		slog.Attr{Key: "path", Value: slog.StringValue(r.URL.Path)},
 		slog.Attr{Key: "remoteIP", Value: slog.StringValue(r.RemoteAddr)},
 		slog.Attr{Key: "proto", Value: slog.StringValue(r.Proto)},
 	}
@@ -218,7 +228,7 @@ func requestLogFields(r *http.Request, concise bool, requestHeaders bool) slog.A
 		requestFields = append(requestFields, slog.Attr{Key: "requestID", Value: slog.StringValue(reqID)})
 	}
 
-	if !requestHeaders {
+	if !options.RequestHeaders {
 		return slog.Group("httpRequest", requestFields...)
 	}
 
@@ -228,14 +238,14 @@ func requestLogFields(r *http.Request, concise bool, requestHeaders bool) slog.A
 		requestFields = append(requestFields,
 			slog.Attr{
 				Key:   "header",
-				Value: slog.GroupValue(headerLogField(r.Header)...),
+				Value: slog.GroupValue(headerLogField(r.Header, options)...),
 			})
 	}
 
 	return slog.Group("httpRequest", requestFields...)
 }
 
-func headerLogField(header http.Header) []slog.Attr {
+func headerLogField(header http.Header, options Options) []slog.Attr {
 	headerField := []slog.Attr{}
 	for k, v := range header {
 		k = strings.ToLower(k)
@@ -255,7 +265,7 @@ func headerLogField(header http.Header) []slog.Attr {
 			}
 		}
 
-		for _, skip := range DefaultOptions.SkipRequestHeaders {
+		for _, skip := range options.SkipRequestHeaders {
 			if k == skip {
 				headerField[len(headerField)] = slog.Attr{
 					Key:   k,
@@ -329,9 +339,9 @@ func LogEntry(ctx context.Context) slog.Logger {
 	}
 }
 
-func LogEntrySetField(ctx context.Context, key, value string) {
+func LogEntrySetField(ctx context.Context, key string, value slog.Value) {
 	if entry, ok := ctx.Value(middleware.LogEntryCtxKey).(*RequestLoggerEntry); ok {
-		entry.Logger = *entry.Logger.With(slog.Attr{Key: key, Value: slog.StringValue(value)})
+		entry.Logger = *entry.Logger.With(slog.Attr{Key: key, Value: value})
 	}
 }
 

@@ -38,6 +38,14 @@ func main() {
 	r.Use(httplog.RequestLogger(logger, []string{"/ping"}))
 	r.Use(middleware.Heartbeat("/ping"))
 
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			httplog.LogEntrySetField(ctx, "user", slog.StringValue("user1"))
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	})
+
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("hello world"))
 	})
