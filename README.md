@@ -1,7 +1,8 @@
 httplog
 =======
 
-Small but powerful structured logging package for HTTP request logging in Go.
+Small but powerful structured logging package for HTTP request logging built
+on the Go 1.21+ stdlib `slog` package.
 
 ```
 go get -u github.com/go-chi/httplog/v2
