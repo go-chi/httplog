@@ -1,35 +1,42 @@
 package httplog
 
 import (
-	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
+	"log/slog"
 )
 
-var DefaultOptions = Options{
-	LogLevel:        "info",
-	LevelFieldName:  "level",
-	JSON:            false,
-	Concise:         false,
-	Tags:            nil,
-	SkipHeaders:     nil,
-	TimeFieldFormat: time.RFC3339Nano,
-	TimeFieldName:   "timestamp",
+var defaultOptions = Options{
+	LogLevel:           slog.LevelInfo,
+	LevelFieldName:     "level",
+	JSON:               false,
+	Concise:            true,
+	Tags:               nil,
+	RequestHeaders:     true,
+	SkipRequestHeaders: nil,
+	QuietDownRoutes:    nil,
+	QuietDownPeriod:    0,
+	TimeFieldFormat:    time.RFC3339Nano,
+	TimeFieldName:      "timestamp",
+	MessageFieldName:   "message",
 }
 
 type Options struct {
 	// LogLevel defines the minimum level of severity that app should log.
-	//
-	// Must be one of: ["trace", "debug", "info", "warn", "error", "critical"]
-	LogLevel string
+	// Must be one of:
+	// slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError
+	LogLevel slog.Level
 
 	// LevelFieldName sets the field name for the log level or severity.
 	// Some providers parse and search for different field names.
 	LevelFieldName string
+
+	// MessageFieldName sets the field name for the message.
+	// Default is "msg".
+	MessageFieldName string
 
 	// JSON enables structured logging output in json. Make sure to enable this
 	// in production mode so log aggregators can receive data in parsable format.
@@ -48,8 +55,21 @@ type Options struct {
 	// name like prod/stg/dev
 	Tags map[string]string
 
-	// SkipHeaders are additional headers which are redacted from the logs
-	SkipHeaders []string
+	// RequestHeaders enables logging of all request headers, however sensitive
+	// headers like authorization, cookie and set-cookie are hidden.
+	RequestHeaders bool
+
+	// SkipRequestHeaders are additional requests headers which are redacted from the logs
+	SkipRequestHeaders []string
+
+	// QuietDownRoutes are routes which are temporarily excluded from logging for a QuietDownPeriod after it occurs
+	// for the first time
+	// to cancel noise from logging for routes that are known to be noisy.
+	QuietDownRoutes []string
+
+	// QuietDownPeriod is the duration for which a route is excluded from logging after it occurs for the first time
+	// if the route is in QuietDownRoutes
+	QuietDownPeriod time.Duration
 
 	// TimeFieldFormat defines the time format of the Time field, defaulting to "time.RFC3339Nano" see options at:
 	// https://pkg.go.dev/time#pkg-constants
@@ -58,14 +78,21 @@ type Options struct {
 	// TimeFieldName sets the field name for the time field.
 	// Some providers parse and search for different field names.
 	TimeFieldName string
+
+	// SourceFieldName sets the field name for the source field which logs
+	// the location in the program source code where the logger was called.
+	// If set to "" then it'll be disabled.
+	SourceFieldName string
+
+	// Writer is the log writer, default is os.Stdout
+	Writer io.Writer
 }
 
-// Configure will set new global/default options for the httplog and behaviour
-// of underlying zerolog pkg and its global logger.
-func Configure(opts Options) {
-	if opts.LogLevel == "" {
-		opts.LogLevel = "info"
-	}
+// Configure will set new options for the httplog instance and behaviour
+// of underlying slog pkg and its global logger.
+func (l *Logger) Configure(opts Options) {
+	// if opts.LogLevel is not set
+	// it would be 0 which is LevelInfo
 
 	if opts.LevelFieldName == "" {
 		opts.LevelFieldName = "level"
@@ -79,26 +106,57 @@ func Configure(opts Options) {
 		opts.TimeFieldName = "timestamp"
 	}
 
+	if len(opts.QuietDownRoutes) > 0 {
+		if opts.QuietDownPeriod == 0 {
+			opts.QuietDownPeriod = 5 * time.Minute
+		}
+	}
+
 	// Pre-downcase all SkipHeaders
-	for i, header := range opts.SkipHeaders {
-		opts.SkipHeaders[i] = strings.ToLower(header)
+	for i, header := range opts.SkipRequestHeaders {
+		opts.SkipRequestHeaders[i] = strings.ToLower(header)
 	}
 
-	DefaultOptions = opts
+	l.Options = opts
 
-	// Config the zerolog global logger
-	logLevel, err := zerolog.ParseLevel(strings.ToLower(opts.LogLevel))
-	if err != nil {
-		fmt.Printf("httplog: error! %v\n", err)
-		os.Exit(1)
+	var addSource bool
+	if opts.SourceFieldName != "" {
+		addSource = true
 	}
-	zerolog.SetGlobalLevel(logLevel)
 
-	zerolog.LevelFieldName = strings.ToLower(opts.LevelFieldName)
-	zerolog.TimestampFieldName = strings.ToLower(opts.TimeFieldName)
-	zerolog.TimeFieldFormat = opts.TimeFieldFormat
+	replaceAttrs := func(_ []string, a slog.Attr) slog.Attr {
+		switch a.Key {
+		case slog.LevelKey:
+			a.Key = opts.LevelFieldName
+		case slog.TimeKey:
+			a.Key = opts.TimeFieldName
+			a.Value = slog.StringValue(a.Value.Time().Format(opts.TimeFieldFormat))
+		case slog.MessageKey:
+			if opts.MessageFieldName != "" {
+				a.Key = opts.MessageFieldName
+			}
+		case slog.SourceKey:
+			if opts.SourceFieldName != "" {
+				a.Key = opts.SourceFieldName
+			}
+		}
+		return a
+	}
+
+	handlerOpts := &slog.HandlerOptions{
+		Level:       opts.LogLevel,
+		ReplaceAttr: replaceAttrs,
+		AddSource:   addSource,
+	}
+
+	writer := opts.Writer
+	if writer == nil {
+		writer = os.Stdout
+	}
 
 	if !opts.JSON {
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: opts.TimeFieldFormat})
+		slog.SetDefault(slog.New(NewPrettyHandler(writer, handlerOpts)))
+	} else {
+		slog.SetDefault(slog.New(slog.NewJSONHandler(writer, handlerOpts)))
 	}
 }
