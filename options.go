@@ -1,6 +1,7 @@
 package httplog
 
 import (
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -82,6 +83,9 @@ type Options struct {
 	// the location in the program source code where the logger was called.
 	// If set to "" then it'll be disabled.
 	SourceFieldName string
+
+	// Writer is the log writer, default is os.Stdout
+	Writer io.Writer
 }
 
 // Configure will set new options for the httplog instance and behaviour
@@ -145,9 +149,14 @@ func (l *Logger) Configure(opts Options) {
 		AddSource:   addSource,
 	}
 
+	writer := opts.Writer
+	if writer == nil {
+		writer = os.Stdout
+	}
+
 	if !opts.JSON {
-		slog.SetDefault(slog.New(NewPrettyHandler(os.Stdout, handlerOpts)))
+		slog.SetDefault(slog.New(NewPrettyHandler(writer, handlerOpts)))
 	} else {
-		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, handlerOpts)))
+		slog.SetDefault(slog.New(slog.NewJSONHandler(writer, handlerOpts)))
 	}
 }
