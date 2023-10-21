@@ -9,16 +9,18 @@ import (
 )
 
 var DefaultOptions = Options{
-	LogLevel:        slog.LevelInfo,
-	LevelFieldName:  "level",
-	JSON:            false,
-	Concise:         false,
-	Tags:            nil,
-	SkipHeaders:     nil,
-	QuietDownRoutes: nil,
-	QuietDownPeriod: 0,
-	TimeFieldFormat: time.RFC3339Nano,
-	TimeFieldName:   "timestamp",
+	LogLevel:           slog.LevelInfo,
+	LevelFieldName:     "level",
+	JSON:               false,
+	Concise:            true,
+	Tags:               nil,
+	RequestHeaders:     true,
+	SkipRequestHeaders: nil,
+	QuietDownRoutes:    nil,
+	QuietDownPeriod:    0,
+	TimeFieldFormat:    time.RFC3339Nano,
+	TimeFieldName:      "timestamp",
+	MessageFieldName:   "message",
 }
 
 type Options struct {
@@ -30,6 +32,10 @@ type Options struct {
 	// LevelFieldName sets the field name for the log level or severity.
 	// Some providers parse and search for different field names.
 	LevelFieldName string
+
+	// MessageFieldName sets the field name for the message.
+	// Default is "msg".
+	MessageFieldName string
 
 	// JSON enables structured logging output in json. Make sure to enable this
 	// in production mode so log aggregators can receive data in parsable format.
@@ -48,8 +54,12 @@ type Options struct {
 	// name like prod/stg/dev
 	Tags map[string]string
 
-	// SkipHeaders are additional headers which are redacted from the logs
-	SkipHeaders []string
+	// RequestHeaders enables logging of all request headers, however sensitive
+	// headers like authorization, cookie and set-cookie are hidden.
+	RequestHeaders bool
+
+	// SkipRequestHeaders are additional requests headers which are redacted from the logs
+	SkipRequestHeaders []string
 
 	// QuietDownRoutes are routes which are temporarily excluded from logging for a QuietDownPeriod after it occurs
 	// for the first time
@@ -69,13 +79,13 @@ type Options struct {
 	TimeFieldName string
 
 	// SourceFieldName sets the field name for the source field which logs
-	// the location where the logger was called
-	// its "" if not enabled
+	// the location in the program source code where the logger was called.
+	// If set to "" then it'll be disabled.
 	SourceFieldName string
 }
 
 // Configure will set new global/default options for the httplog and behaviour
-// of underlying zerolog pkg and its global logger.
+// of underlying slog pkg and its global logger.
 func Configure(opts Options) {
 	// if opts.LogLevel is not set
 	// it would be 0 which is LevelInfo
@@ -99,8 +109,8 @@ func Configure(opts Options) {
 	}
 
 	// Pre-downcase all SkipHeaders
-	for i, header := range opts.SkipHeaders {
-		opts.SkipHeaders[i] = strings.ToLower(header)
+	for i, header := range opts.SkipRequestHeaders {
+		opts.SkipRequestHeaders[i] = strings.ToLower(header)
 	}
 
 	DefaultOptions = opts
@@ -117,6 +127,10 @@ func Configure(opts Options) {
 		case slog.TimeKey:
 			a.Key = opts.TimeFieldName
 			a.Value = slog.StringValue(a.Value.Time().Format(opts.TimeFieldFormat))
+		case slog.MessageKey:
+			if opts.MessageFieldName != "" {
+				a.Key = opts.MessageFieldName
+			}
 		case slog.SourceKey:
 			if opts.SourceFieldName != "" {
 				a.Key = opts.SourceFieldName

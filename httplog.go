@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
-
-	"log/slog"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -22,8 +21,7 @@ func NewLogger(serviceName string, opts ...Options) *slog.Logger {
 	} else {
 		Configure(DefaultOptions)
 	}
-	logger := slog.With(slog.Attr{Key: "service", Value: slog.StringValue(strings.ToLower(serviceName))})
-	// logger := log.With().Str("service", strings.ToLower(serviceName))
+	logger := slog.With(slog.Attr{Key: "service", Value: slog.StringValue(serviceName)})
 	if !DefaultOptions.Concise && len(DefaultOptions.Tags) > 0 {
 		group := []any{}
 		for k, v := range DefaultOptions.Tags {
@@ -100,9 +98,16 @@ type requestLogger struct {
 func (l *requestLogger) NewLogEntry(r *http.Request) middleware.LogEntry {
 	entry := &RequestLoggerEntry{}
 	msg := fmt.Sprintf("Request: %s %s", r.Method, r.URL.Path)
-	entry.Logger = *l.Logger.With(requestLogFields(r, true))
+
+	if DefaultOptions.RequestHeaders {
+		entry.Logger = *l.Logger.With(requestLogFields(r, DefaultOptions.Concise, true))
+	} else {
+		entry.Logger = *l.Logger.With(requestLogFields(r, false, false))
+	}
+
+	// entry.Logger = *l.Logger.With(requestLogFields(r, true))
 	if !DefaultOptions.Concise {
-		entry.Logger = *l.Logger.With(requestLogFields(r, DefaultOptions.Concise))
+		// entry.Logger = *l.Logger.With(requestLogFields(r, DefaultOptions.Concise, DefaultOptions.RequestHeaders))
 		entry.Logger.Info(msg)
 	}
 	return entry
@@ -145,12 +150,14 @@ func (l *RequestLoggerEntry) Panic(v interface{}, stack []byte) {
 	if DefaultOptions.JSON {
 		stacktrace = string(stack)
 	}
-	l.Logger = *l.Logger.With(slog.Attr{Key: "stacktrace", Value: slog.StringValue(stacktrace)},
-		slog.Attr{Key: "panic", Value: slog.StringValue(fmt.Sprintf("%+v", v))})
-	// l.Logger = l.Logger.With().
-	// 	Str("stacktrace", stacktrace).
-	// 	Str("panic", fmt.Sprintf("%+v", v)).
-	// 	Logger()
+	l.Logger = *l.Logger.With(
+		slog.Attr{
+			Key:   "stacktrace",
+			Value: slog.StringValue(stacktrace)},
+		slog.Attr{
+			Key:   "panic",
+			Value: slog.StringValue(fmt.Sprintf("%+v", v)),
+		})
 
 	l.msg = fmt.Sprintf("%+v", v)
 
@@ -193,7 +200,7 @@ func inArray(arr []string, val string) bool {
 	return false
 }
 
-func requestLogFields(r *http.Request, concise bool) slog.Attr {
+func requestLogFields(r *http.Request, concise bool, requestHeaders bool) slog.Attr {
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
@@ -209,20 +216,20 @@ func requestLogFields(r *http.Request, concise bool) slog.Attr {
 	}
 	if reqID := middleware.GetReqID(r.Context()); reqID != "" {
 		requestFields = append(requestFields, slog.Attr{Key: "requestID", Value: slog.StringValue(reqID)})
-		// requestFields["requestID"] = reqID
 	}
 
-	if concise {
+	if !requestHeaders {
 		return slog.Group("httpRequest", requestFields...)
 	}
 
-	// requestFields["scheme"] = scheme
+	// include request headers
 	requestFields = append(requestFields, slog.Attr{Key: "scheme", Value: slog.StringValue(scheme)})
 	if len(r.Header) > 0 {
-		// requestFields["header"] = headerLogField(r.Header)
 		requestFields = append(requestFields,
-			slog.Attr{Key: "header",
-				Value: slog.GroupValue(headerLogField(r.Header)...)})
+			slog.Attr{
+				Key:   "header",
+				Value: slog.GroupValue(headerLogField(r.Header)...),
+			})
 	}
 
 	return slog.Group("httpRequest", requestFields...)
@@ -240,7 +247,6 @@ func headerLogField(header http.Header) []slog.Attr {
 		default:
 			headerField = append(headerField, slog.Attr{Key: k,
 				Value: slog.StringValue(fmt.Sprintf("[%s]", strings.Join(v, "], [")))})
-			// headerField = fmt.Sprintf("[%s]", strings.Join(v, "], ["))
 		}
 		if k == "authorization" || k == "cookie" || k == "set-cookie" {
 			headerField[len(headerField)] = slog.Attr{
@@ -249,7 +255,7 @@ func headerLogField(header http.Header) []slog.Attr {
 			}
 		}
 
-		for _, skip := range DefaultOptions.SkipHeaders {
+		for _, skip := range DefaultOptions.SkipRequestHeaders {
 			if k == skip {
 				headerField[len(headerField)] = slog.Attr{
 					Key:   k,

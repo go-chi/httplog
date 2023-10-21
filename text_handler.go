@@ -12,29 +12,29 @@ import (
 )
 
 type PrettyHandler struct {
-	mu                sync.Mutex
 	opts              *slog.HandlerOptions
 	w                 io.Writer
 	preformattedAttrs *bytes.Buffer
 	groupPrefix       *string
 	groupOpen         bool
+	mu                sync.Mutex
 }
 
 var DefaultHandlerConfig = &slog.HandlerOptions{
-	AddSource: true,
 	Level:     slog.LevelInfo,
+	AddSource: true,
 }
 
-func NewPrettyHandler(w io.Writer, op ...*slog.HandlerOptions) *PrettyHandler {
-	var config *slog.HandlerOptions
-	if len(op) == 0 {
-		config = DefaultHandlerConfig
+func NewPrettyHandler(w io.Writer, options ...*slog.HandlerOptions) *PrettyHandler {
+	var opts *slog.HandlerOptions
+	if len(options) == 0 {
+		opts = DefaultHandlerConfig
 	} else {
-		config = op[0]
+		opts = options[0]
 	}
 
 	return &PrettyHandler{
-		opts:              config,
+		opts:              opts,
 		w:                 w,
 		preformattedAttrs: &bytes.Buffer{},
 		mu:                sync.Mutex{},
@@ -45,7 +45,7 @@ var _ slog.Handler = &PrettyHandler{}
 
 func (h *PrettyHandler) Enabled(ctx context.Context, level slog.Level) bool {
 	minLevel := slog.LevelInfo
-	if h.opts.Level != nil {
+	if h.opts != nil && h.opts.Level != nil {
 		minLevel = h.opts.Level.Level()
 	}
 	return level >= minLevel
@@ -59,13 +59,13 @@ func (h *PrettyHandler) Handle(ctx context.Context, r slog.Record) error {
 			Key:   slog.TimeKey,
 			Value: slog.TimeValue(r.Time),
 		}
-		if h.opts.ReplaceAttr != nil {
+		if h.opts != nil && h.opts.ReplaceAttr != nil {
 			timeAttr = h.opts.ReplaceAttr([]string{}, timeAttr)
 		} else {
 			timeAttr.Value = slog.StringValue(timeAttr.Value.Time().Format(time.RFC3339Nano))
 		}
 		// write time, level and source to buf
-		cW(buf, true, nGreen, "%s", timeAttr.Value.String())
+		cW(buf, true, bBlack, "%s", timeAttr.Value.String())
 		buf.WriteString(" ")
 	}
 
@@ -73,13 +73,13 @@ func (h *PrettyHandler) Handle(ctx context.Context, r slog.Record) error {
 		Key:   slog.LevelKey,
 		Value: slog.StringValue(r.Level.String()),
 	}
-	if h.opts.ReplaceAttr != nil {
+	if h.opts != nil && h.opts.ReplaceAttr != nil {
 		levelAttr = h.opts.ReplaceAttr([]string{}, levelAttr)
 	}
 	cW(buf, true, levelColor(r.Level), "%s", levelAttr.Value.String())
 	buf.WriteString(" ")
 
-	if h.opts.AddSource {
+	if h.opts != nil && h.opts.AddSource {
 		s := source(r)
 		file := s.File
 		line := s.Line
@@ -89,7 +89,7 @@ func (h *PrettyHandler) Handle(ctx context.Context, r slog.Record) error {
 	}
 
 	// write message to buf
-	cW(buf, true, nWhite, "%s", r.Message)
+	cW(buf, true, bWhite, "%s", r.Message)
 	buf.WriteString(" ")
 	// write preformatted attrs to buf
 	buf.Write(h.preformattedAttrs.Bytes())

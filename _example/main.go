@@ -2,23 +2,24 @@ package main
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
-	"log/slog"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/httplog"
+	"github.com/go-chi/httplog/v2"
 )
 
 func main() {
 	// Logger
 	logger := httplog.NewLogger("httplog-example", httplog.Options{
-		JSON:            false,
-		LogLevel:        slog.LevelDebug,
-		Concise:         true,
-		TimeFieldFormat: time.RFC850,
+		// JSON:             true,
+		LogLevel:         slog.LevelDebug,
+		Concise:          true,
+		RequestHeaders:   true,
+		MessageFieldName: "message",
+		// TimeFieldFormat: time.RFC850,
 		Tags: map[string]string{
 			"version": "v1.0-81aa4244d9fc8076a",
 			"env":     "dev",
@@ -28,6 +29,7 @@ func main() {
 			"/ping",
 		},
 		QuietDownPeriod: 10 * time.Second,
+		// RequestHeaders:  true,
 		// SourceFieldName: "source",
 	})
 
@@ -65,5 +67,5 @@ func main() {
 		w.Write([]byte("err here"))
 	})
 
-	http.ListenAndServe(":8000", r)
+	http.ListenAndServe("localhost:8000", r)
 }
