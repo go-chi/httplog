@@ -259,15 +259,15 @@ func headerLogField(header http.Header, options Options) []slog.Attr {
 				Value: slog.StringValue(fmt.Sprintf("[%s]", strings.Join(v, "], [")))})
 		}
 		if k == "authorization" || k == "cookie" || k == "set-cookie" {
-			headerField[len(headerField)] = slog.Attr{
+			headerField[len(headerField)-1] = slog.Attr{
 				Key:   k,
 				Value: slog.StringValue("***"),
 			}
 		}
 
-		for _, skip := range options.SkipRequestHeaders {
+		for _, skip := range options.HideRequestHeaders {
 			if k == skip {
-				headerField[len(headerField)] = slog.Attr{
+				headerField[len(headerField)-1] = slog.Attr{
 					Key:   k,
 					Value: slog.StringValue("***"),
 				}

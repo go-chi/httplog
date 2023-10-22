@@ -16,7 +16,7 @@ var defaultOptions = Options{
 	Concise:            true,
 	Tags:               nil,
 	RequestHeaders:     true,
-	SkipRequestHeaders: nil,
+	HideRequestHeaders: nil,
 	QuietDownRoutes:    nil,
 	QuietDownPeriod:    0,
 	TimeFieldFormat:    time.RFC3339Nano,
@@ -59,8 +59,8 @@ type Options struct {
 	// headers like authorization, cookie and set-cookie are hidden.
 	RequestHeaders bool
 
-	// SkipRequestHeaders are additional requests headers which are redacted from the logs
-	SkipRequestHeaders []string
+	// HideRequestHeaders are additional requests headers which are redacted from the logs
+	HideRequestHeaders []string
 
 	// QuietDownRoutes are routes which are temporarily excluded from logging for a QuietDownPeriod after it occurs
 	// for the first time
@@ -113,8 +113,8 @@ func (l *Logger) Configure(opts Options) {
 	}
 
 	// Pre-downcase all SkipHeaders
-	for i, header := range opts.SkipRequestHeaders {
-		opts.SkipRequestHeaders[i] = strings.ToLower(header)
+	for i, header := range opts.HideRequestHeaders {
+		opts.HideRequestHeaders[i] = strings.ToLower(header)
 	}
 
 	l.Options = opts
