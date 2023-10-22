@@ -69,7 +69,7 @@ func main() {
 
 	r.Get("/err", func(w http.ResponseWriter, r *http.Request) {
 		oplog := httplog.LogEntry(r.Context())
-		oplog.Error("msg here", errors.New("err here"))
+		oplog.Error("msg here", "err", errors.New("err here"))
 		w.WriteHeader(500)
 		w.Write([]byte("err here"))
 	})
