@@ -97,6 +97,15 @@ func (h *PrettyHandler) Handle(ctx context.Context, r slog.Record) error {
 	if h.groupOpen {
 		cW(h.preformattedAttrs, true, nWhite, "%s", "}")
 	}
+
+	// write record level attrs to buf
+	attrs := []slog.Attr{}
+	r.Attrs(func(attr slog.Attr) bool {
+		attrs = append(attrs, attr)
+		return true
+	})
+	writeAttrs(buf, attrs, false)
+
 	buf.WriteString("\n")
 	h.mu.Lock()
 	defer h.mu.Unlock()
