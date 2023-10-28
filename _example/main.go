@@ -73,7 +73,7 @@ func main() {
 		// two varianets of syntax to specify "err" attr.
 		err := errors.New("err here")
 		// oplog.Error("msg here", "err", err)
-		oplog.Error("msg here", httplog.WithErr(err))
+		oplog.Error("msg here", httplog.ErrAttr(err))
 
 		// logging with the global logger also works
 		slog.Default().With(slog.Group("ImpGroup", slog.String("account", "id"))).Error("doesn't exist")

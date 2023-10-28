@@ -316,7 +316,7 @@ func statusLabel(status int) string {
 	}
 }
 
-func WithErr(err error) slog.Attr {
+func ErrAttr(err error) slog.Attr {
 	return slog.Any("err", err)
 }
 
