@@ -86,6 +86,10 @@ type Options struct {
 
 	// Writer is the log writer, default is os.Stdout
 	Writer io.Writer
+
+	// ReplaceAttrsOverride allows to add custom logic to replace attributes
+	// in addition to the default logic set in this package.
+	ReplaceAttrsOverride func(groups []string, a slog.Attr) slog.Attr
 }
 
 // Configure will set new options for the httplog instance and behaviour
@@ -124,7 +128,7 @@ func (l *Logger) Configure(opts Options) {
 		addSource = true
 	}
 
-	replaceAttrs := func(_ []string, a slog.Attr) slog.Attr {
+	replaceAttrs := func(groups []string, a slog.Attr) slog.Attr {
 		switch a.Key {
 		case slog.LevelKey:
 			a.Key = opts.LevelFieldName
@@ -139,6 +143,10 @@ func (l *Logger) Configure(opts Options) {
 			if opts.SourceFieldName != "" {
 				a.Key = opts.SourceFieldName
 			}
+		}
+
+		if opts.ReplaceAttrsOverride != nil {
+			return opts.ReplaceAttrsOverride(groups, a)
 		}
 		return a
 	}
