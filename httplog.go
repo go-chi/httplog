@@ -316,6 +316,10 @@ func statusLabel(status int) string {
 	}
 }
 
+func WithErr(err error) slog.Attr {
+	return slog.Any("err", err)
+}
+
 // Helper methods used by the application to get the request-scoped
 // logger entry and set additional fields between handlers.
 //

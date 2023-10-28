@@ -69,7 +69,11 @@ func main() {
 
 	r.Get("/err", func(w http.ResponseWriter, r *http.Request) {
 		oplog := httplog.LogEntry(r.Context())
-		oplog.Error("msg here", "err", errors.New("err here"))
+
+		// two varianets of syntax to specify "err" attr.
+		err := errors.New("err here")
+		// oplog.Error("msg here", "err", err)
+		oplog.Error("msg here", httplog.WithErr(err))
 
 		// logging with the global logger also works
 		slog.Default().With(slog.Group("ImpGroup", slog.String("account", "id"))).Error("doesn't exist")
