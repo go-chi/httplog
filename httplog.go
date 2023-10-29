@@ -147,7 +147,7 @@ func (l *RequestLoggerEntry) Write(status, bytes int, header http.Header, elapse
 			body, _ := extra.([]byte)
 			responseLog = append(responseLog, slog.Attr{Key: "body", Value: slog.StringValue(string(body))})
 		}
-		if len(header) > 0 {
+		if l.Options.ResponseHeaders && len(header) > 0 {
 			responseLog = append(responseLog, slog.Group("header", attrsToAnys(headerLogField(header, l.Options))...))
 		}
 	}
