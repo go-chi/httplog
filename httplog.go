@@ -218,7 +218,8 @@ func statusLevel(status int) zerolog.Level {
 	case status < 400: // for codes in 100s, 200s, 300s
 		return zerolog.InfoLevel
 	case status >= 400 && status < 500:
-		return zerolog.WarnLevel
+		// switching to info level to be less noisy
+		return zerolog.InfoLevel
 	case status >= 500:
 		return zerolog.ErrorLevel
 	default:
