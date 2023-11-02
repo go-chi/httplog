@@ -293,7 +293,8 @@ func statusLevel(status int) slog.Level {
 	case status < 400: // for codes in 100s, 200s, 300s
 		return slog.LevelInfo
 	case status >= 400 && status < 500:
-		return slog.LevelWarn
+		// switching to info level to be less noisy
+		return slog.LevelInfo
 	case status >= 500:
 		return slog.LevelError
 	default:
