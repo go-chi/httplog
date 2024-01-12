@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"log/slog"
 	"runtime"
 	"sync"
 	"time"
-
-	"log/slog"
 )
 
 type PrettyHandler struct {
@@ -65,7 +64,7 @@ func (h *PrettyHandler) Handle(ctx context.Context, r slog.Record) error {
 			timeAttr.Value = slog.StringValue(timeAttr.Value.Time().Format(time.RFC3339Nano))
 		}
 		// write time, level and source to buf
-		cW(buf, true, bBlack, "%s", timeAttr.Value.String())
+		cW(buf, false, bBlack, "%s", timeAttr.Value.String())
 		buf.WriteString(" ")
 	}
 
