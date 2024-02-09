@@ -107,7 +107,7 @@ type requestLogger struct {
 }
 
 func (l *requestLogger) NewLogEntry(r *http.Request) middleware.LogEntry {
-	entry := &RequestLoggerEntry{}
+	entry := &RequestLoggerEntry{Options: l.Options}
 	msg := fmt.Sprintf("Request: %s %s", r.Method, r.URL.Path)
 
 	if l.Options.RequestHeaders {
