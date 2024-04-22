@@ -28,7 +28,7 @@ func NewLogger(serviceName string, options ...Options) *Logger {
 		logger.Configure(defaultOptions)
 	}
 
-	slogger := slog.With(slog.Attr{Key: "service", Value: slog.StringValue(serviceName)})
+	slogger := logger.Logger.With(slog.Attr{Key: "service", Value: slog.StringValue(serviceName)})
 
 	if !logger.Options.Concise && len(logger.Options.Tags) > 0 {
 		group := []any{}

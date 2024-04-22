@@ -166,9 +166,9 @@ func (l *Logger) Configure(opts Options) {
 	}
 
 	if !opts.JSON {
-		slog.SetDefault(slog.New(NewPrettyHandler(writer, handlerOpts)))
+		l.Logger = slog.New(NewPrettyHandler(writer, handlerOpts))
 	} else {
-		slog.SetDefault(slog.New(slog.NewJSONHandler(writer, handlerOpts)))
+		l.Logger = slog.New(slog.NewJSONHandler(writer, handlerOpts))
 	}
 }
 
