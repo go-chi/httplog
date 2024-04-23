@@ -47,7 +47,7 @@ func TestLogEntrySetFields(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			entry := &RequestLoggerEntry{
-				Logger: *slog.New(tt.args.handler),
+				Logger: slog.New(tt.args.handler),
 			}
 			req := middleware.WithLogEntry(httptest.NewRequest("GET", "/", nil), entry)
 			LogEntrySetFields(req.Context(), tt.args.fields)
