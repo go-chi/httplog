@@ -1,6 +1,7 @@
 package httplog
 
 import (
+	"cmp"
 	"io"
 	"os"
 	"strings"
@@ -93,6 +94,22 @@ type Options struct {
 	// ReplaceAttrsOverride allows to add custom logic to replace attributes
 	// in addition to the default logic set in this package.
 	ReplaceAttrsOverride func(groups []string, a slog.Attr) slog.Attr
+
+	// Trace is the configuration for distributed tracing.
+	Trace *TraceOptions
+}
+
+// TraceOptions are the configuration options for distributed tracing.
+type TraceOptions struct {
+	// HeaderTrace is the header key used to read the trace id from the incoming request.
+	// Default is "X-Trace-ID".
+	HeaderTrace string
+	// LogFieldTrace is the field name used to log the trace id.
+	// Default is "trace_id".
+	LogFieldTrace string
+	// LogFieldSpan is the field name used to log the span id.
+	// Default is "span_id".
+	LogFieldSpan string
 }
 
 // Configure will set new options for the httplog instance and behaviour
@@ -169,6 +186,13 @@ func (l *Logger) Configure(opts Options) {
 		l.Logger = slog.New(NewPrettyHandler(writer, handlerOpts))
 	} else {
 		l.Logger = slog.New(slog.NewJSONHandler(writer, handlerOpts))
+	}
+
+	l.Options.Trace = opts.Trace
+	if l.Options.Trace != nil {
+		l.Options.Trace.HeaderTrace = cmp.Or(l.Options.Trace.HeaderTrace, _headerTraceID)
+		l.Options.Trace.LogFieldTrace = cmp.Or(l.Options.Trace.LogFieldTrace, _logFieldTrace)
+		l.Options.Trace.LogFieldSpan = cmp.Or(l.Options.Trace.LogFieldSpan, _logFieldSpan)
 	}
 }
 

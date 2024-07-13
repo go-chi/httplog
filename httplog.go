@@ -80,6 +80,19 @@ func Handler(logger *Logger, optSkipPaths ...[]string) func(next http.Handler) h
 				return
 			}
 
+			ctx := r.Context()
+			if logger.Options.Trace != nil {
+				traceID := r.Header.Get(logger.Options.Trace.HeaderTrace)
+				if traceID == "" {
+					traceID = newID()
+				}
+				w.Header().Set(logger.Options.Trace.HeaderTrace, traceID)
+				ctx = context.WithValue(ctx, _contextKeyTrace, traceID)
+				ctx = context.WithValue(ctx, _contextKeySpan, newID())
+			}
+
+			r = r.WithContext(ctx)
+
 			entry := f.NewLogEntry(r)
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
@@ -110,11 +123,16 @@ func (l *requestLogger) NewLogEntry(r *http.Request) middleware.LogEntry {
 	entry := &RequestLoggerEntry{l.Logger, l.Options, ""}
 	msg := fmt.Sprintf("Request: %s %s", r.Method, r.URL.Path)
 
-	if l.Options.RequestHeaders {
-		entry.Logger = l.Logger.With(requestLogFields(r, l.Options, true))
-	} else {
-		entry.Logger = l.Logger.With(requestLogFields(r, l.Options, false))
+	logger := l.Logger
+
+	if traceID, ok := r.Context().Value(_contextKeyTrace).(string); ok {
+		logger = logger.With(slog.Attr{Key: l.Options.Trace.LogFieldTrace, Value: slog.StringValue(traceID)})
 	}
+	if spanID, ok := r.Context().Value(_contextKeySpan).(string); ok {
+		logger = logger.With(slog.Attr{Key: l.Options.Trace.LogFieldSpan, Value: slog.StringValue(spanID)})
+	}
+
+	entry.Logger = logger.With(requestLogFields(r, l.Options, l.Options.RequestHeaders))
 
 	if !l.Options.Concise {
 		entry.Logger.Info(msg)
