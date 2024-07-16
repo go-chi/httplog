@@ -370,12 +370,12 @@ func LogEntrySetField(ctx context.Context, key string, value slog.Value) {
 
 func LogEntrySetFields(ctx context.Context, fields map[string]interface{}) {
 	if entry, ok := ctx.Value(middleware.LogEntryCtxKey).(*RequestLoggerEntry); ok {
-		attrs := make([]slog.Attr, len(fields))
+		attrs := make([]any, len(fields))
 		i := 0
 		for k, v := range fields {
 			attrs[i] = slog.Attr{Key: k, Value: slog.AnyValue(v)}
 			i++
 		}
-		entry.Logger = entry.Logger.With(attrs)
+		entry.Logger = entry.Logger.With(attrs...)
 	}
 }

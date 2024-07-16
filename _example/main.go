@@ -42,7 +42,16 @@ func main() {
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
+
+			// Set a single log field
 			httplog.LogEntrySetField(ctx, "user", slog.StringValue("user1"))
+
+			// Set multiple fields
+			fields := map[string]any{
+				"remote": "example.com",
+				"action": "update",
+			}
+			httplog.LogEntrySetFields(ctx, fields)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	})
