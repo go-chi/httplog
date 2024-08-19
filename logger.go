@@ -145,3 +145,28 @@ type ResponseLog struct {
 	Duration time.Duration
 	Body     []byte
 }
+
+// DebugContext calls [Logger.DebugContext] on the default logger.
+func DebugContext(ctx context.Context, msg string, args ...any) {
+	slog.Default().DebugContext(ctx, msg, args...)
+}
+
+// InfoContext calls [Logger.InfoContext] on the default logger.
+func InfoContext(ctx context.Context, msg string, args ...any) {
+	slog.Default().InfoContext(ctx, msg, args...)
+}
+
+// WarnContext calls [Logger.WarnContext] on the default logger.
+func WarnContext(ctx context.Context, msg string, args ...any) {
+	slog.Default().WarnContext(ctx, msg, args...)
+}
+
+// ErrorContext calls [Logger.ErrorContext] on the default logger.
+func ErrorContext(ctx context.Context, msg string, args ...any) {
+	slog.Default().ErrorContext(ctx, msg, args...)
+}
+
+// LogAttrs calls [Logger.LogAttrs] on the default logger.
+func LogAttrs(ctx context.Context, level slog.Level, msg string, attrs ...slog.Attr) {
+	slog.Default().LogAttrs(ctx, level, msg, attrs...)
+}
