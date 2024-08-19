@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 )
 
 type DefaultHandler struct {
@@ -18,9 +19,9 @@ func (h *DefaultHandler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (h *DefaultHandler) Handle(ctx context.Context, r slog.Record) error {
-	log, ok := ctx.Value(ctxKey{}).(Log)
+	log, ok := ctx.Value(logCtxKey{}).(*Log)
 	if !ok {
-		panic("fuuu")
+		panic("fuuu.. did you use httplog.DefaultHandler without http.RequestLogger middleware")
 		return h.Handler.Handle(ctx, r)
 	}
 
@@ -44,6 +45,7 @@ func (h *DefaultHandler) Handle(ctx context.Context, r slog.Record) error {
 	r.AddAttrs(slog.Any("response", resp))
 
 	r.AddAttrs(h.attrs...)
+	r.AddAttrs(log.Attrs...)
 
 	return h.Handler.Handle(ctx, r)
 }
@@ -57,4 +59,17 @@ func (c *DefaultHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 func (c *DefaultHandler) clone() *DefaultHandler {
 	clone := *c
 	return &clone
+}
+
+func getHeaderAttrs(header http.Header, headers []string) []slog.Attr {
+	attrs := make([]slog.Attr, 0, len(headers))
+	for _, h := range headers {
+		vals := header.Values(h)
+		if len(vals) == 1 {
+			attrs = append(attrs, slog.String(h, vals[0]))
+		} else if len(vals) > 1 {
+			attrs = append(attrs, slog.Any(h, vals))
+		}
+	}
+	return attrs
 }

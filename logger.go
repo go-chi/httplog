@@ -50,6 +50,7 @@ type Options struct {
 }
 
 var defaultOptions = Options{
+	Level:              slog.LevelInfo,
 	LogRequestHeaders:  []string{"User-Agent", "Referer"},
 	LogRequestStart:    false,
 	LogResponseHeaders: []string{""},
@@ -64,39 +65,36 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 			scheme = "https"
 		}
 
-		reqLog := RequestLog{
-			Scheme:     scheme,
-			Method:     r.Method,
-			Host:       r.Host,
-			URL:        r.URL,
-			Header:     r.Header,
-			RemoteAddr: r.RemoteAddr,
-			Proto:      r.Proto,
+		logValue := &Log{
+			Req: RequestLog{
+				Scheme:     scheme,
+				Method:     r.Method,
+				Host:       r.Host,
+				URL:        r.URL,
+				Header:     r.Header,
+				RemoteAddr: r.RemoteAddr,
+				Proto:      r.Proto,
+			},
 		}
 
+		ctx = context.WithValue(ctx, logCtxKey{}, logValue)
+
 		if l.opts.LogRequestStart {
-			ctx = context.WithValue(ctx, ctxKey{}, Log{
-				Req: reqLog,
-			})
-			l.InfoContext(ctx, "Request")
+			l.InfoContext(ctx, "Request started")
 		}
 
 		start := time.Now()
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
 		defer func() {
-			respLog := ResponseLog{
+			logValue.Resp = ResponseLog{
 				Header:   w.Header,
 				Status:   ww.Status(),
 				Bytes:    ww.BytesWritten(),
 				Duration: time.Since(start),
 			}
 
-			ctx = context.WithValue(ctx, ctxKey{}, Log{
-				Req:  reqLog,
-				Resp: respLog,
-			})
-			l.InfoContext(ctx, "Response")
+			l.InfoContext(ctx, "Request finished")
 		}()
 
 		next.ServeHTTP(ww, r.WithContext(ctx))
@@ -104,8 +102,10 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 }
 
 type Log struct {
-	Req  RequestLog
-	Resp ResponseLog
+	Level slog.Level  // httplog.SetLevel(ctx, slog.DebugLevel)
+	Attrs []slog.Attr // httplog.SetAttrs(ctx, slog.String("key", "value"))
+	Req   RequestLog  // Set automatically in httplog.RequestLogger middleware at the start of request
+	Resp  ResponseLog // Set automatically in httplog.RequestLogger middleware at the end of request
 }
 
 type RequestLog struct {
@@ -125,17 +125,4 @@ type ResponseLog struct {
 	Bytes    int
 	Duration time.Duration
 	Body     []byte
-}
-
-func getHeaderAttrs(header http.Header, headers []string) []slog.Attr {
-	attrs := make([]slog.Attr, 0, len(headers))
-	for _, h := range headers {
-		vals := header.Values(h)
-		if len(vals) == 1 {
-			attrs = append(attrs, slog.String(h, vals[0]))
-		} else if len(vals) > 1 {
-			attrs = append(attrs, slog.Any(h, vals))
-		}
-	}
-	return attrs
 }
