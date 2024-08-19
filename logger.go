@@ -1,9 +1,10 @@
-package reqslog
+package httplog
 
 import (
-	"fmt"
+	"context"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
@@ -18,18 +19,31 @@ func NewRequestLogger(logger *slog.Logger, opts *Options) *Logger {
 		opts = &defaultOptions
 	}
 
+	handler := &DefaultHandler{
+		Handler: logger.Handler(),
+		level:   opts.Level,
+		opts:    opts,
+	}
+
 	return &Logger{
-		logger: logger,
-		opts:   *opts,
+		Logger: slog.New(handler),
+		opts:   opts,
 	}
 }
 
 type Logger struct {
-	logger *slog.Logger
-	opts   Options
+	*slog.Logger
+	opts *Options
 }
 
 type Options struct {
+	Level slog.Level
+
+	// Idea: Let users enable/disable request log per their own rules (e.g. force logs for admins).
+	// EnableLog func(r *http.Request) bool
+	//
+	// Or should this be a context-aware function, e.g. httplog.EnableLog(ctx), which you can call in any handler/middleware?
+
 	LogRequestHeaders  []string
 	LogRequestStart    bool
 	LogResponseHeaders []string
@@ -43,48 +57,74 @@ var defaultOptions = Options{
 
 func (l *Logger) Handle(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 		ctx := r.Context()
-		// ctx = context.WithValue(loggerAttrs, ..)
 
 		scheme := "http"
 		if r.TLS != nil {
 			scheme = "https"
 		}
 
-		req := slog.GroupValue(
-			slog.String("url", fmt.Sprintf("%s://%s%s", scheme, r.Host, r.RequestURI)),
-			slog.String("method", r.Method),
-			slog.String("path", r.URL.Path),
-			slog.String("remoteIp", r.RemoteAddr),
-			slog.String("proto", r.Proto),
-			slog.Any("headers", slog.GroupValue(getHeaderAttrs(r.Header, l.opts.LogRequestHeaders)...)),
-		)
+		reqLog := RequestLog{
+			Scheme:     scheme,
+			Method:     r.Method,
+			Host:       r.Host,
+			URL:        r.URL,
+			Header:     r.Header,
+			RemoteAddr: r.RemoteAddr,
+			Proto:      r.Proto,
+		}
 
 		if l.opts.LogRequestStart {
-			l.logger.With(
-				"request", req,
-			).InfoContext(ctx, "Request")
+			ctx = context.WithValue(ctx, ctxKey{}, Log{
+				Req: reqLog,
+			})
+			l.InfoContext(ctx, "Request")
 		}
 
 		start := time.Now()
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
 		defer func() {
-			resp := slog.GroupValue(
-				slog.Any("headers", slog.GroupValue(getHeaderAttrs(w.Header(), l.opts.LogResponseHeaders)...)),
-				slog.Int("status", ww.Status()),
-				slog.Any("duration", time.Since(start)),
-			)
+			respLog := ResponseLog{
+				Header:   w.Header,
+				Status:   ww.Status(),
+				Bytes:    ww.BytesWritten(),
+				Duration: time.Since(start),
+			}
 
-			l.logger.With(
-				"request", req,
-				"response", resp,
-			).InfoContext(ctx, "Response")
+			ctx = context.WithValue(ctx, ctxKey{}, Log{
+				Req:  reqLog,
+				Resp: respLog,
+			})
+			l.InfoContext(ctx, "Response")
 		}()
 
 		next.ServeHTTP(ww, r.WithContext(ctx))
 	})
+}
+
+type Log struct {
+	Req  RequestLog
+	Resp ResponseLog
+}
+
+type RequestLog struct {
+	Scheme     string
+	Method     string
+	Host       string
+	URL        *url.URL
+	Header     http.Header
+	RemoteAddr string
+	Proto      string
+	Body       []byte
+}
+
+type ResponseLog struct {
+	Header   func() http.Header
+	Status   int
+	Bytes    int
+	Duration time.Duration
+	Body     []byte
 }
 
 func getHeaderAttrs(header http.Header, headers []string) []slog.Attr {
