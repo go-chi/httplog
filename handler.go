@@ -25,16 +25,19 @@ func (h *DefaultHandler) Handle(ctx context.Context, r slog.Record) error {
 		panic("use of httplog.DefaultHandler outside of context set by http.RequestLogger middleware")
 	}
 
-	if h.opts.Consise {
-		r.Message = fmt.Sprintf("%s %s://%s%s", log.Req.Method, log.Req.Scheme, log.Req.Host, log.Req.URL)
+	if h.opts.Concise {
 		r.AddAttrs(slog.Any("request", slog.GroupValue(
-			slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.RequestHeaders)...)),
+			slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.ReqHeaders)...)),
 		)))
 
 		if log.Resp != nil {
+			r.Message = fmt.Sprintf("HTTP %v (%v): %s %s", log.Resp.Status, log.Resp.Duration, log.Req.Method, log.Req.URL)
+
 			r.AddAttrs(slog.Any("response", slog.GroupValue(
-				slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.ResponseHeaders)...)),
+				slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.RespHeaders)...)),
 			)))
+		} else {
+			r.Message = fmt.Sprintf("%s %s://%s%s", log.Req.Method, log.Req.Scheme, log.Req.Host, log.Req.URL)
 		}
 	} else {
 		r.AddAttrs(slog.Any("request", slog.GroupValue(
@@ -43,13 +46,13 @@ func (h *DefaultHandler) Handle(ctx context.Context, r slog.Record) error {
 			slog.String("path", log.Req.URL.Path),
 			slog.String("remoteIp", log.Req.RemoteAddr),
 			slog.String("proto", log.Req.Proto),
-			slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.RequestHeaders)...)),
+			slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.ReqHeaders)...)),
 		)))
 
 		r.AddAttrs(slog.Any("response", slog.GroupValue(
-			slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Resp.Header(), h.opts.ResponseHeaders)...)),
+			slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Resp.Header(), h.opts.RespHeaders)...)),
 			slog.Int("status", log.Resp.Status),
-			slog.Any("duration", log.Resp.Duration),
+			slog.Float64("duration", float64(log.Resp.Duration.Nanoseconds()/1000000.0)), // in milliseconds
 		)))
 	}
 

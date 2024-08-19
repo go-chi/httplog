@@ -47,20 +47,20 @@ type Options struct {
 	// Concise mode includes fewer log attributes details during the request flow. For example
 	// excluding details like request content length, user-agent and other details.
 	// This is useful if your console is too noisy during development.
-	Consise bool
+	Concise bool
 
-	// RequestHeaders is an explicit list of headers to be logged in request.headers attribute group.
-	RequestHeaders []string
+	// ReqHeaders is an explicit list of headers to be logged in request.headers attribute group.
+	ReqHeaders []string
 
-	// ResponseHeaders is an explicit list of headers to be logged in response.headers attribute group.
-	ResponseHeaders []string
+	// RespHeaders is an explicit list of headers to be logged in response.headers attribute group.
+	RespHeaders []string
 }
 
 var defaultOptions = Options{
-	Level:           slog.LevelInfo,
-	Consise:         false,
-	RequestHeaders:  []string{"User-Agent", "Referer"},
-	ResponseHeaders: []string{""},
+	Level:       slog.LevelInfo,
+	Concise:     false,
+	ReqHeaders:  []string{"User-Agent", "Referer", "Origin"},
+	RespHeaders: []string{""},
 }
 
 func (l *Logger) Handle(next http.Handler) http.Handler {
