@@ -21,28 +21,37 @@ func (h *DefaultHandler) Enabled(ctx context.Context, level slog.Level) bool {
 func (h *DefaultHandler) Handle(ctx context.Context, r slog.Record) error {
 	log, ok := ctx.Value(logCtxKey{}).(*Log)
 	if !ok {
-		panic("fuuu.. did you use httplog.DefaultHandler without http.RequestLogger middleware")
-		return h.Handler.Handle(ctx, r)
+		// Panic to stress test the use of this handler. Later, we can return error.
+		panic("use of httplog.DefaultHandler outside of context set by http.RequestLogger middleware")
 	}
 
-	req := slog.GroupValue(
-		slog.String("url", fmt.Sprintf("%s://%s%s", log.Req.Scheme, log.Req.Host, log.Req.URL)),
-		slog.String("method", log.Req.Method),
-		slog.String("path", log.Req.URL.Path),
-		slog.String("remoteIp", log.Req.RemoteAddr),
-		slog.String("proto", log.Req.Proto),
-		slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.LogRequestHeaders)...)),
-	)
+	if h.opts.Consise {
+		r.Message = fmt.Sprintf("%s %s://%s%s", log.Req.Method, log.Req.Scheme, log.Req.Host, log.Req.URL)
+		r.AddAttrs(slog.Any("request", slog.GroupValue(
+			slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.RequestHeaders)...)),
+		)))
 
-	r.AddAttrs(slog.Any("request", req))
+		if log.Resp != nil {
+			r.AddAttrs(slog.Any("response", slog.GroupValue(
+				slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.ResponseHeaders)...)),
+			)))
+		}
+	} else {
+		r.AddAttrs(slog.Any("request", slog.GroupValue(
+			slog.String("url", fmt.Sprintf("%s://%s%s", log.Req.Scheme, log.Req.Host, log.Req.URL)),
+			slog.String("method", log.Req.Method),
+			slog.String("path", log.Req.URL.Path),
+			slog.String("remoteIp", log.Req.RemoteAddr),
+			slog.String("proto", log.Req.Proto),
+			slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.RequestHeaders)...)),
+		)))
 
-	resp := slog.GroupValue(
-		slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Resp.Header(), h.opts.LogResponseHeaders)...)),
-		slog.Int("status", log.Resp.Status),
-		slog.Any("duration", log.Resp.Duration),
-	)
-
-	r.AddAttrs(slog.Any("response", resp))
+		r.AddAttrs(slog.Any("response", slog.GroupValue(
+			slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Resp.Header(), h.opts.ResponseHeaders)...)),
+			slog.Int("status", log.Resp.Status),
+			slog.Any("duration", log.Resp.Duration),
+		)))
+	}
 
 	r.AddAttrs(h.attrs...)
 	r.AddAttrs(log.Attrs...)

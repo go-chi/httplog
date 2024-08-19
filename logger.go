@@ -37,23 +37,30 @@ type Logger struct {
 }
 
 type Options struct {
+	// Level defines the verbosity of the requests logs:
+	// slog.LevelDebug - log both request starts & responses (incl. OPTIONS)
+	// slog.LevelInfo  - log responses (excl. OPTIONS)
+	// slog.LevelWarn  - log only 4xx and 5xx responses (except for 429)
+	// slog.LevelError - log only 5xx responses only
 	Level slog.Level
 
-	// Idea: Let users enable/disable request log per their own rules (e.g. force logs for admins).
-	// EnableLog func(r *http.Request) bool
-	//
-	// Or should this be a context-aware function, e.g. httplog.EnableLog(ctx), which you can call in any handler/middleware?
+	// Concise mode includes fewer log attributes details during the request flow. For example
+	// excluding details like request content length, user-agent and other details.
+	// This is useful if your console is too noisy during development.
+	Consise bool
 
-	LogRequestHeaders  []string
-	LogRequestStart    bool
-	LogResponseHeaders []string
+	// RequestHeaders is an explicit list of headers to be logged in request.headers attribute group.
+	RequestHeaders []string
+
+	// ResponseHeaders is an explicit list of headers to be logged in response.headers attribute group.
+	ResponseHeaders []string
 }
 
 var defaultOptions = Options{
-	Level:              slog.LevelInfo,
-	LogRequestHeaders:  []string{"User-Agent", "Referer"},
-	LogRequestStart:    false,
-	LogResponseHeaders: []string{""},
+	Level:           slog.LevelInfo,
+	Consise:         false,
+	RequestHeaders:  []string{"User-Agent", "Referer"},
+	ResponseHeaders: []string{""},
 }
 
 func (l *Logger) Handle(next http.Handler) http.Handler {
@@ -66,6 +73,7 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 		}
 
 		logValue := &Log{
+			Level: l.opts.Level,
 			Req: RequestLog{
 				Scheme:     scheme,
 				Method:     r.Method,
@@ -78,23 +86,34 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 		}
 
 		ctx = context.WithValue(ctx, logCtxKey{}, logValue)
-
-		if l.opts.LogRequestStart {
-			l.InfoContext(ctx, "Request started")
-		}
+		l.DebugContext(ctx, "Request started")
 
 		start := time.Now()
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
 		defer func() {
-			logValue.Resp = ResponseLog{
+			status := ww.Status()
+
+			logValue.Resp = &ResponseLog{
 				Header:   w.Header,
-				Status:   ww.Status(),
+				Status:   status,
 				Bytes:    ww.BytesWritten(),
 				Duration: time.Since(start),
 			}
 
-			l.InfoContext(ctx, "Request finished")
+			lvl := slog.LevelInfo
+			if r.Method == "OPTIONS" {
+				lvl = slog.LevelDebug
+			}
+			if status >= 500 {
+				lvl = slog.LevelError
+			} else if status == 429 {
+				lvl = slog.LevelInfo
+			} else if status >= 400 {
+				lvl = slog.LevelWarn
+			}
+
+			l.LogAttrs(ctx, lvl, "Request finished")
 		}()
 
 		next.ServeHTTP(ww, r.WithContext(ctx))
@@ -102,10 +121,10 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 }
 
 type Log struct {
-	Level slog.Level  // httplog.SetLevel(ctx, slog.DebugLevel)
-	Attrs []slog.Attr // httplog.SetAttrs(ctx, slog.String("key", "value"))
-	Req   RequestLog  // Set automatically in httplog.RequestLogger middleware at the start of request
-	Resp  ResponseLog // Set automatically in httplog.RequestLogger middleware at the end of request
+	Level slog.Level   // Use httplog.SetLevel(ctx, slog.DebugLevel) to override level
+	Attrs []slog.Attr  // Use httplog.SetAttrs(ctx, slog.String("key", "value")) to append
+	Req   RequestLog   // Automatically set on request start by httplog.RequestLogger middleware
+	Resp  *ResponseLog // Automatically set on request end by httplog.RequestLogger middleware
 }
 
 type RequestLog struct {

@@ -17,19 +17,21 @@ func (c *logCtxKey) String() string {
 func SetAttrs(ctx context.Context, attrs ...slog.Attr) {
 	log, ok := ctx.Value(logCtxKey{}).(*Log)
 	if !ok {
-		panic("httplog.SetAttrs() used outside of context with httplog.RequestLogger")
+		// Panic to stress test the use of this function. Later, we can return error.
+		panic("use of httplog.SetAttrs() outside of context set by httplog.RequestLogger")
 	}
 	log.Attrs = append(log.Attrs, attrs...)
 }
 
-// SetLevel overrides default log level. Useful for overriding log level in a middleware,
-// eg. log a group of /admin/* endpoints or for privileged sessions.
+// SetLevel overrides default request log level for this request. Useful for overriding
+// log level in a middleware, eg. to force log a group of /admin/* endpoints or for privileged sessions.
 //
 // NOTE: Not safe for concurrent access. Don't use outside of HTTP request goroutine.
 func SetLevel(ctx context.Context, level slog.Level) {
 	log, ok := ctx.Value(logCtxKey{}).(*Log)
 	if !ok {
-		panic("httplog.SetAttrs() used outside of context with httplog.RequestLogger")
+		// Panic to stress test the use of this function. Later, we can return error.
+		panic("use of httplog.SetLevel() outside of context set by httplog.RequestLogger")
 	}
 	log.Level = level
 }
