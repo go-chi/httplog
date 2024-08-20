@@ -12,14 +12,16 @@ A small but powerful structured logging package for HTTP request logging, built 
 
 ## Example
 
-See [_example/main.go](./_example/main.go) and try running it locally:
+See [_example/main.go](./_example/main.go). Try running it locally:
 ```sh
-$ go run github.com/golang-cz/httplog/_example
+$ ENV=production go run github.com/golang-cz/httplog/_example
 
 $ ENV=localhost go run github.com/golang-cz/httplog/_example
 ```
 
 ## Usage
+
+`go get github.com/golang-cz/httplog@latest`
 
 ```go
 package main
@@ -48,16 +50,16 @@ func main() {
 
 	// Request logger
 	r.Use(httplog.RequestLogger(logger, &httplog.Options{
-		// Level defines the verbosity of the requests logs:
+		// Level defines the verbosity of the request logs:
 		// slog.LevelDebug - log both request starts & responses (incl. OPTIONS)
-		// slog.LevelInfo  - log responses (excl. OPTIONS)
+		// slog.LevelInfo  - log all responses (excl. OPTIONS)
 		// slog.LevelWarn  - log 4xx and 5xx responses only (except for 429)
 		// slog.LevelError - log 5xx responses only
 		Level: slog.LevelInfo,
 
 		// Concise mode causes fewer log attributes to be printed in request logs.
 		// This is useful if your console is too noisy during development.
-		Concise: isLocalhost,
+		Concise: false,
 
 		// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 		// and middlewares. It returns HTTP 500 unless response status was already set.
@@ -66,12 +68,12 @@ func main() {
 		RecoverPanics: true,
 
 		// Select request/response headers to be logged explicitly.
-		ReqHeaders:  []string{"User-Agent", "Origin", "Referer", traceid.Header},
-		RespHeaders: []string{traceid.Header},
+		LogRequestHeaders:  []string{"User-Agent", "Origin", "Referer"},
+		LogResponseHeaders: []string{},
 
 		// You can log request/request body. Useful for debugging.
-		ReqBody:  false,
-		RespBody: false,
+		LogRequestBody:  false,
+		LogResponseBody: false,
 	}))
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {

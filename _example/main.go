@@ -48,9 +48,9 @@ func main() {
 
 	// Request logger
 	r.Use(httplog.RequestLogger(logger, &httplog.Options{
-		// Level defines the verbosity of the requests logs:
+		// Level defines the verbosity of the request logs:
 		// slog.LevelDebug - log both request starts & responses (incl. OPTIONS)
-		// slog.LevelInfo  - log responses (excl. OPTIONS)
+		// slog.LevelInfo  - log all responses (excl. OPTIONS)
 		// slog.LevelWarn  - log 4xx and 5xx responses only (except for 429)
 		// slog.LevelError - log 5xx responses only
 		Level: slog.LevelInfo,
@@ -66,12 +66,12 @@ func main() {
 		RecoverPanics: true,
 
 		// Select request/response headers to be logged explicitly.
-		ReqHeaders:  []string{"User-Agent", "Origin", "Referer", traceid.Header},
-		RespHeaders: []string{traceid.Header},
+		LogRequestHeaders:  []string{"User-Agent", "Origin", "Referer", traceid.Header},
+		LogResponseHeaders: []string{traceid.Header},
 
 		// You can log request/request body. Useful for debugging.
-		ReqBody:  false,
-		RespBody: false,
+		LogRequestBody:  false,
+		LogResponseBody: false,
 	}))
 
 	r.Use(func(next http.Handler) http.Handler {
@@ -124,6 +124,18 @@ func main() {
 		w.Write([]byte("oops, err \n"))
 	})
 
+	r.Post("/body", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// Log request/response bodies for Admin requests.
+		if r.Header.Get("Authorization") == "Bearer ADMIN-SECRET" {
+			httplog.LogRequestBody(ctx)
+			httplog.LogResponseBody(ctx)
+		}
+
+		w.Write([]byte(`{"response": "payload"}`))
+	})
+
 	fmt.Println("Enable pretty logs with:")
 	fmt.Println("  ENV=localhost go run ./")
 	fmt.Println()
@@ -133,6 +145,8 @@ func main() {
 	fmt.Println("  curl -v http://localhost:8000/info")
 	fmt.Println("  curl -v http://localhost:8000/warn")
 	fmt.Println("  curl -v http://localhost:8000/err")
+	fmt.Println(`  curl -v http://localhost:8000/body -X POST --data '{"request": "data"}'`)
+	fmt.Println(`  curl -v http://localhost:8000/body -X POST --data '{"request": "data"}' -H "Authorization: Bearer ADMIN-SECRET"`)
 	fmt.Println()
 
 	if err := http.ListenAndServe("localhost:8000", r); err != http.ErrAbortHandler {

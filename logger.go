@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"runtime"
 	"time"
 
@@ -36,7 +35,7 @@ type Logger struct {
 }
 
 type Options struct {
-	// Level defines the verbosity of the requests logs:
+	// Level defines the verbosity of the request logs:
 	// slog.LevelDebug - log both request starts & responses (incl. OPTIONS)
 	// slog.LevelInfo  - log responses (excl. OPTIONS)
 	// slog.LevelWarn  - log 4xx and 5xx responses only (except for 429)
@@ -53,47 +52,36 @@ type Options struct {
 	// NOTE: The request logger logs all panics automatically, regardless of this setting.
 	RecoverPanics bool
 
-	// ReqHeaders is an explicit list of headers to be logged as attributes.
-	ReqHeaders []string
+	// LogRequestHeaders is an explicit list of headers to be logged as attributes.
+	LogRequestHeaders []string
 
-	// ReqBody enables logging of request body into a response log attribute.
-	ReqBody bool
+	// LogRequestBody enables logging of request body into a response log attribute.
+	LogRequestBody bool
 
-	// RespHeaders is an explicit list of headers to be logged as attributes.
-	RespHeaders []string
+	// LogResponseHeaders is an explicit list of headers to be logged as attributes.
+	LogResponseHeaders []string
 
-	// RespBody enables logging of response body into a response log attribute.
-	RespBody bool
+	// LogResponseBody enables logging of response body into a response log attribute.
+	LogResponseBody bool
 }
 
 var defaultOptions = Options{
-	Level:         slog.LevelInfo,
-	Concise:       false,
-	RecoverPanics: true,
-	ReqHeaders:    []string{"User-Agent", "Referer", "Origin"},
-	RespHeaders:   []string{""},
+	Level:              slog.LevelInfo,
+	Concise:            false,
+	RecoverPanics:      true,
+	LogRequestHeaders:  []string{"User-Agent", "Referer", "Origin"},
+	LogResponseHeaders: []string{""},
 }
 
 func (l *Logger) Handle(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		scheme := "http"
-		if r.TLS != nil {
-			scheme = "https"
-		}
-
 		log := &Log{
-			Level: l.opts.Level,
-			Req: RequestLog{
-				Scheme:     scheme,
-				Method:     r.Method,
-				Host:       r.Host,
-				URL:        r.URL,
-				Header:     r.Header,
-				RemoteAddr: r.RemoteAddr,
-				Proto:      r.Proto,
-			},
+			Level:           l.opts.Level,
+			Req:             r,
+			LogRequestBody:  l.opts.LogRequestBody,
+			LogResponseBody: l.opts.LogResponseBody,
 		}
 
 		ctx = context.WithValue(ctx, logCtxKey{}, log)
@@ -101,15 +89,13 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 
 		start := time.Now()
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+		log.WW = ww
 
-		var reqBody bytes.Buffer
-		if l.opts.ReqBody {
-			r.Body = io.NopCloser(io.TeeReader(r.Body, &reqBody))
+		if log.LogRequestBody {
+			r.Body = io.NopCloser(io.TeeReader(r.Body, &log.ReqBody))
 		}
-
-		var respBody bytes.Buffer
-		if l.opts.RespBody {
-			ww.Tee(&respBody)
+		if log.LogResponseBody {
+			ww.Tee(&log.RespBody)
 		}
 
 		defer func() {
@@ -137,23 +123,15 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 
 			log.Resp = &ResponseLog{
 				Header:   w.Header,
-				Status:   status,
-				Bytes:    ww.BytesWritten(),
 				Duration: time.Since(start),
-				Body:     respBody,
 			}
 
-			if l.opts.ReqBody {
+			if log.LogRequestBody {
 				// Make sure to read full request body if the underlying handler didn't do so.
 				n, _ := io.Copy(io.Discard, r.Body)
 				if n == 0 {
-					log.Req.BodyFullyRead = true
+					log.ReqBodyFullyRead = true
 				}
-				log.Req.Body = reqBody
-			}
-
-			if l.opts.RespBody {
-				log.Resp.Body = respBody
 			}
 
 			lvl := slog.LevelInfo
@@ -176,32 +154,25 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 }
 
 type Log struct {
-	Level   slog.Level   // Use httplog.SetLevel(ctx, slog.DebugLevel) to override level
-	Attrs   []slog.Attr  // Use httplog.SetAttrs(ctx, slog.String("key", "value")) to append
-	Req     RequestLog   // Automatically set on request start by httplog.RequestLogger middleware
-	Resp    *ResponseLog // Automatically set on request end by httplog.RequestLogger middleware
-	Panic   any
-	PanicPC []uintptr
-}
+	Level           slog.Level  // Use httplog.SetLevel(ctx, slog.DebugLevel) to override level
+	Attrs           []slog.Attr // Use httplog.SetAttrs(ctx, slog.String("key", "value")) to append
+	LogRequestBody  bool        // Use httplog.LogRequestBody(ctx) to force-enable
+	LogResponseBody bool        // Use httplog.LogResponseBody(ctx) to force-enable
 
-type RequestLog struct {
-	Scheme        string
-	Method        string
-	Host          string
-	URL           *url.URL
-	Header        http.Header
-	RemoteAddr    string
-	Proto         string
-	Body          bytes.Buffer
-	BodyFullyRead bool
+	// Fields automatically set by httplog.RequestLogger middleware:
+	Req              *http.Request
+	ReqBody          bytes.Buffer
+	ReqBodyFullyRead bool
+	WW               middleware.WrapResponseWriter
+	Resp             *ResponseLog
+	RespBody         bytes.Buffer
+	Panic            any
+	PanicPC          []uintptr
 }
 
 type ResponseLog struct {
 	Header   func() http.Header
-	Status   int
-	Bytes    int
 	Duration time.Duration
-	Body     bytes.Buffer
 }
 
 // DebugContext calls [Logger.DebugContext] on the default logger.

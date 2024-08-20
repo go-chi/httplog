@@ -30,59 +30,66 @@ func (h *Handler) Enabled(ctx context.Context, level slog.Level) bool {
 	return level >= h.opts.Level
 }
 
-func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
+func (h *Handler) Handle(ctx context.Context, rec slog.Record) error {
 	log, ok := ctx.Value(logCtxKey{}).(*Log)
 	if !ok {
 		// Panic to stress test the use of this handler. Later, we can return error.
 		panic("use of httplog.DefaultHandler outside of context set by http.RequestLogger middleware")
 	}
 
+	// r := log.Req
+
+	scheme := "http"
+	if log.Req.TLS != nil {
+		scheme = "https"
+	}
+
 	if h.opts.Concise {
-		r.AddAttrs(slog.Any("requestHeaders", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.ReqHeaders)...)))
-		if h.opts.ReqBody && log.Resp != nil {
-			r.AddAttrs(slog.String("requestBody", log.Req.Body.String()))
-			if !log.Req.BodyFullyRead {
-				r.AddAttrs(slog.Bool("requestBodyFullyRead", false))
+		rec.AddAttrs(slog.Any("requestHeaders", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.LogRequestHeaders)...)))
+		if log.LogRequestBody && log.Resp != nil {
+			rec.AddAttrs(slog.String("requestBody", log.ReqBody.String()))
+			if !log.ReqBodyFullyRead {
+				rec.AddAttrs(slog.Bool("requestBodyFullyRead", false))
 			}
 		}
 
 		if log.Resp != nil {
-			r.Message = fmt.Sprintf("HTTP %v (%v): %s %s", log.Resp.Status, log.Resp.Duration, log.Req.Method, log.Req.URL)
-			r.AddAttrs(slog.Any("responseHeaders", slog.GroupValue(getHeaderAttrs(log.Resp.Header(), h.opts.RespHeaders)...)))
-			if h.opts.RespBody {
-				r.AddAttrs(slog.String("responseBody", log.Resp.Body.String()))
+			rec.Message = fmt.Sprintf("HTTP %v (%v): %s %s", log.WW.Status(), log.Resp.Duration, log.Req.Method, log.Req.URL)
+			rec.AddAttrs(slog.Any("responseHeaders", slog.GroupValue(getHeaderAttrs(log.Resp.Header(), h.opts.LogResponseHeaders)...)))
+			if log.LogResponseBody {
+				rec.AddAttrs(slog.String("responseBody", log.RespBody.String()))
 			}
 		} else {
-			r.Message = fmt.Sprintf("%s %s://%s%s", log.Req.Method, log.Req.Scheme, log.Req.Host, log.Req.URL)
+			rec.Message = fmt.Sprintf("%s %s://%s%s", log.Req.Method, scheme, log.Req.Host, log.Req.URL)
 		}
 	} else {
 		reqAttrs := []slog.Attr{
-			slog.String("url", fmt.Sprintf("%s://%s%s", log.Req.Scheme, log.Req.Host, log.Req.URL)),
+			slog.String("url", fmt.Sprintf("%s://%s%s", scheme, log.Req.Host, log.Req.URL)),
 			slog.String("method", log.Req.Method),
 			slog.String("path", log.Req.URL.Path),
 			slog.String("remoteIp", log.Req.RemoteAddr),
 			slog.String("proto", log.Req.Proto),
-			slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.ReqHeaders)...)),
+			slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.LogRequestHeaders)...)),
 		}
-		if h.opts.ReqBody && log.Resp != nil {
-			reqAttrs = append(reqAttrs, slog.String("body", log.Req.Body.String()))
-			if !log.Req.BodyFullyRead {
+		if log.LogRequestBody && log.Resp != nil {
+			reqAttrs = append(reqAttrs, slog.String("body", log.ReqBody.String()))
+			if !log.ReqBodyFullyRead {
 				reqAttrs = append(reqAttrs, slog.Bool("bodyFullyRead", false))
 			}
 		}
-		r.AddAttrs(slog.Any("request", slog.GroupValue(reqAttrs...)))
+		rec.AddAttrs(slog.Any("request", slog.GroupValue(reqAttrs...)))
 
 		if log.Resp != nil {
 			respAttrs := []slog.Attr{
-				slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Resp.Header(), h.opts.RespHeaders)...)),
-				slog.Int("status", log.Resp.Status),
-				slog.Int("bytes", log.Resp.Bytes),
+				slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Resp.Header(), h.opts.LogResponseHeaders)...)),
+				slog.Int("status", log.WW.Status()),
+				slog.Int("bytes", log.WW.BytesWritten()),
 				slog.Float64("duration", float64(log.Resp.Duration.Nanoseconds()/1000000.0)), // in milliseconds
 			}
-			if h.opts.RespBody {
-				respAttrs = append(respAttrs, slog.String("body", log.Resp.Body.String()))
+			if log.LogResponseBody {
+				respAttrs = append(respAttrs, slog.String("body", log.RespBody.String()))
 			}
-			r.AddAttrs(slog.Any("response", slog.GroupValue(respAttrs...)))
+			rec.AddAttrs(slog.Any("response", slog.GroupValue(respAttrs...)))
 		}
 	}
 
@@ -99,16 +106,16 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 				break
 			}
 		}
-		r.AddAttrs(
+		rec.AddAttrs(
 			slog.Any("panic", log.Panic),
 			slog.Any("panicStack", stackValues),
 		)
 	}
 
-	r.AddAttrs(h.attrs...)
-	r.AddAttrs(log.Attrs...)
+	rec.AddAttrs(h.attrs...)
+	rec.AddAttrs(log.Attrs...)
 
-	return h.Handler.Handle(ctx, r)
+	return h.Handler.Handle(ctx, rec)
 }
 
 func (c *Handler) WithAttrs(attrs []slog.Attr) slog.Handler {
