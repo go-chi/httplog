@@ -1,9 +1,14 @@
-# HTTP request logger
+# httplog - HTTP Request Logger
 
-- HTTP middleware that logs single structured log per request/response
-- Implements frontend (`slog.Logger`) and backend (`slog.Handler`) separately to improve critical performance of serving HTTP response
-- The provided backend `slog.Handler` is extensible and/or replaceable
-- Allows attaching log attributes to the single log line from within downstream HTTP handlers/middlewares
+A small but powerful structured logging package for HTTP request logging, built on the Go 1.21+ standard library `slog` package.
+
+## Features
+
+- **Efficient Logging**: Separates frontend (`slog.Logger`) and backend (`slog.Handler`) to optimize performance in serving HTTP responses quickly.
+- **Extensible Backend**: The provided backend `slog.Handler` is both extensible and replaceable, allowing customization to suit your logging needs.
+- **Flexible Attribute Attachment**: Supports attaching additional log attributes from within downstream HTTP handlers or middlewares, ensuring comprehensive and contextual logging.
+- **Debug Request and Response Bodies**: Provides options to log request and response bodies for debugging and analysis.
+- **Panic Recovery**: Optionally recovers from panics in underlying HTTP handlers or middlewares, logging the error and ensuring a consistent response status code.
 
 ## Example
 
@@ -41,13 +46,13 @@ func main() {
 
 	r := chi.NewRouter()
 
-	// Logger
+	// Request logger
 	r.Use(httplog.RequestLogger(logger, &httplog.Options{
 		// Level defines the verbosity of the requests logs:
 		// slog.LevelDebug - log both request starts & responses (incl. OPTIONS)
 		// slog.LevelInfo  - log responses (excl. OPTIONS)
-		// slog.LevelWarn  - log only 4xx and 5xx responses (except for 429)
-		// slog.LevelError - log only 5xx responses only
+		// slog.LevelWarn  - log 4xx and 5xx responses only (except for 429)
+		// slog.LevelError - log 5xx responses only
 		Level: slog.LevelInfo,
 
 		// Concise mode causes fewer log attributes to be printed in request logs.
@@ -57,7 +62,7 @@ func main() {
 		// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 		// and middlewares. It returns HTTP 500 unless response status was already set.
 		//
-		// NOTE: The request logger automatically logs all panics, regardless of this setting.
+		// NOTE: The request logger logs all panics automatically, regardless of this setting.
 		RecoverPanics: true,
 
 		// Select request/response headers to be logged explicitly.
@@ -90,4 +95,4 @@ func main() {
 - [ ] Add tests
 
 ## License
-MIT
+[MIT license](./LICENSE)

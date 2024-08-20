@@ -39,8 +39,8 @@ type Options struct {
 	// Level defines the verbosity of the requests logs:
 	// slog.LevelDebug - log both request starts & responses (incl. OPTIONS)
 	// slog.LevelInfo  - log responses (excl. OPTIONS)
-	// slog.LevelWarn  - log only 4xx and 5xx responses (except for 429)
-	// slog.LevelError - log only 5xx responses only
+	// slog.LevelWarn  - log 4xx and 5xx responses only (except for 429)
+	// slog.LevelError - log 5xx responses only
 	Level slog.Level
 
 	// Concise mode causes fewer log attributes to be printed in request logs.
@@ -50,7 +50,7 @@ type Options struct {
 	// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 	// and middlewares. It returns HTTP 500 unless response status was already set.
 	//
-	// NOTE: The request logger automatically logs all panics, regardless of this setting.
+	// NOTE: The request logger logs all panics automatically, regardless of this setting.
 	RecoverPanics bool
 
 	// ReqHeaders is an explicit list of headers to be logged as attributes.
