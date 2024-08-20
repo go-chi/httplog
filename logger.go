@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"runtime"
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
@@ -44,23 +45,29 @@ type Options struct {
 	// slog.LevelError - log only 5xx responses only
 	Level slog.Level
 
-	// Concise mode includes fewer log attributes details during the request flow. For example
-	// excluding details like request content length, user-agent and other details.
+	// Concise mode causes fewer log attributes to be printed in request logs.
 	// This is useful if your console is too noisy during development.
 	Concise bool
 
-	// ReqHeaders is an explicit list of headers to be logged in request.headers attribute group.
+	// RecoverPanics recovers from panics caused in the underlying HTTP handlers
+	// and middlewares. It returns HTTP 500 unless response status was already set.
+	//
+	// NOTE: The request logger automatically logs all panics, regardless of this setting.
+	RecoverPanics bool
+
+	// ReqHeaders is an explicit list of headers to be logged as attributes.
 	ReqHeaders []string
 
-	// RespHeaders is an explicit list of headers to be logged in response.headers attribute group.
+	// RespHeaders is an explicit list of headers to be logged as attributes.
 	RespHeaders []string
 }
 
 var defaultOptions = Options{
-	Level:       slog.LevelInfo,
-	Concise:     false,
-	ReqHeaders:  []string{"User-Agent", "Referer", "Origin"},
-	RespHeaders: []string{""},
+	Level:         slog.LevelInfo,
+	Concise:       false,
+	RecoverPanics: true,
+	ReqHeaders:    []string{"User-Agent", "Referer", "Origin"},
+	RespHeaders:   []string{""},
 }
 
 func (l *Logger) Handle(next http.Handler) http.Handler {
@@ -92,6 +99,26 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
 		defer func() {
+			if rec := recover(); rec != nil {
+				if rec != http.ErrAbortHandler {
+					pc := make([]uintptr, 10)   // Capture up to 10 stack frames.
+					n := runtime.Callers(3, pc) // Skip 3 frames (this middleware + runtime/panic.go).
+
+					logValue.Panic = rec
+					logValue.PanicPC = pc[:n]
+				}
+
+				// Return HTTP 500 if recover is enabled and no response status was set.
+				if l.opts.RecoverPanics && ww.Status() == 0 && r.Header.Get("Connection") != "Upgrade" {
+					ww.WriteHeader(http.StatusInternalServerError)
+				}
+
+				if rec == http.ErrAbortHandler || !l.opts.RecoverPanics {
+					// Always re-panic http.ErrAbortHandler. Re-panic everything unless recover is enabled.
+					defer panic(rec)
+				}
+			}
+
 			status := ww.Status()
 
 			logValue.Resp = &ResponseLog{
@@ -121,10 +148,12 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 }
 
 type Log struct {
-	Level slog.Level   // Use httplog.SetLevel(ctx, slog.DebugLevel) to override level
-	Attrs []slog.Attr  // Use httplog.SetAttrs(ctx, slog.String("key", "value")) to append
-	Req   RequestLog   // Automatically set on request start by httplog.RequestLogger middleware
-	Resp  *ResponseLog // Automatically set on request end by httplog.RequestLogger middleware
+	Level   slog.Level   // Use httplog.SetLevel(ctx, slog.DebugLevel) to override level
+	Attrs   []slog.Attr  // Use httplog.SetAttrs(ctx, slog.String("key", "value")) to append
+	Req     RequestLog   // Automatically set on request start by httplog.RequestLogger middleware
+	Resp    *ResponseLog // Automatically set on request end by httplog.RequestLogger middleware
+	Panic   any
+	PanicPC []uintptr
 }
 
 type RequestLog struct {

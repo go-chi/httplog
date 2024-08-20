@@ -6,7 +6,7 @@
 - Allows enabling/disabling request logs per request using context helpers
 
 ## TODO
-- [ ] Integrate panic Recoverer
+- [x] Integrate panic Recoverer
 - [ ] Debug request body
 - [ ] Debug response body
 - [ ] Print request as CURL
