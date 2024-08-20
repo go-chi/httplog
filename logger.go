@@ -1,7 +1,9 @@
 package httplog
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -58,8 +60,14 @@ type Options struct {
 	// ReqHeaders is an explicit list of headers to be logged as attributes.
 	ReqHeaders []string
 
+	// ReqBody enables logging of request body into a response log attribute.
+	ReqBody bool
+
 	// RespHeaders is an explicit list of headers to be logged as attributes.
 	RespHeaders []string
+
+	// RespBody enables logging of response body into a response log attribute.
+	RespBody bool
 }
 
 var defaultOptions = Options{
@@ -79,7 +87,7 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 			scheme = "https"
 		}
 
-		logValue := &Log{
+		log := &Log{
 			Level: l.opts.Level,
 			Req: RequestLog{
 				Scheme:     scheme,
@@ -92,11 +100,21 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 			},
 		}
 
-		ctx = context.WithValue(ctx, logCtxKey{}, logValue)
+		ctx = context.WithValue(ctx, logCtxKey{}, log)
 		l.DebugContext(ctx, "Request started")
 
 		start := time.Now()
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+
+		var reqBody bytes.Buffer
+		if l.opts.ReqBody {
+			r.Body = io.NopCloser(io.TeeReader(r.Body, &reqBody))
+		}
+
+		var respBody bytes.Buffer
+		if l.opts.RespBody {
+			ww.Tee(&respBody)
+		}
 
 		defer func() {
 			if rec := recover(); rec != nil {
@@ -104,8 +122,8 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 					pc := make([]uintptr, 10)   // Capture up to 10 stack frames.
 					n := runtime.Callers(3, pc) // Skip 3 frames (this middleware + runtime/panic.go).
 
-					logValue.Panic = rec
-					logValue.PanicPC = pc[:n]
+					log.Panic = rec
+					log.PanicPC = pc[:n]
 				}
 
 				// Return HTTP 500 if recover is enabled and no response status was set.
@@ -121,11 +139,25 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 
 			status := ww.Status()
 
-			logValue.Resp = &ResponseLog{
+			log.Resp = &ResponseLog{
 				Header:   w.Header,
 				Status:   status,
 				Bytes:    ww.BytesWritten(),
 				Duration: time.Since(start),
+				Body:     respBody,
+			}
+
+			if l.opts.ReqBody {
+				// Make sure to read full request body if the underlying handler didn't do so.
+				n, _ := io.Copy(io.Discard, r.Body)
+				if n == 0 {
+					log.Req.BodyFullyRead = true
+				}
+				log.Req.Body = reqBody
+			}
+
+			if l.opts.RespBody {
+				log.Resp.Body = respBody
 			}
 
 			lvl := slog.LevelInfo
@@ -157,14 +189,15 @@ type Log struct {
 }
 
 type RequestLog struct {
-	Scheme     string
-	Method     string
-	Host       string
-	URL        *url.URL
-	Header     http.Header
-	RemoteAddr string
-	Proto      string
-	Body       []byte
+	Scheme        string
+	Method        string
+	Host          string
+	URL           *url.URL
+	Header        http.Header
+	RemoteAddr    string
+	Proto         string
+	Body          bytes.Buffer
+	BodyFullyRead bool
 }
 
 type ResponseLog struct {
@@ -172,7 +205,7 @@ type ResponseLog struct {
 	Status   int
 	Bytes    int
 	Duration time.Duration
-	Body     []byte
+	Body     bytes.Buffer
 }
 
 // DebugContext calls [Logger.DebugContext] on the default logger.

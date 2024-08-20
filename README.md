@@ -7,9 +7,8 @@
 
 ## TODO
 - [x] Integrate panic Recoverer
-- [ ] Debug request body
-- [ ] Debug response body
-- [ ] Print request as CURL
+- [x] Debug request body
+- [x] Debug response body
 - [ ] Robust example
 
 ## Example
