@@ -9,22 +9,28 @@ import (
 	"strings"
 )
 
-type DefaultHandler struct {
+type Handler struct {
 	slog.Handler
-	level slog.Level
 	opts  *Options
 	attrs []slog.Attr
 }
 
-func (h *DefaultHandler) Enabled(ctx context.Context, level slog.Level) bool {
+func NewHandler(handler slog.Handler, opts *Options) *Handler {
+	return &Handler{
+		Handler: handler,
+		opts:    opts,
+	}
+}
+
+func (h *Handler) Enabled(ctx context.Context, level slog.Level) bool {
 	if log, ok := ctx.Value(logCtxKey{}).(*Log); ok {
 		return level >= log.Level
 	}
 
-	return level >= h.level
+	return level >= h.opts.Level
 }
 
-func (h *DefaultHandler) Handle(ctx context.Context, r slog.Record) error {
+func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 	log, ok := ctx.Value(logCtxKey{}).(*Log)
 	if !ok {
 		// Panic to stress test the use of this handler. Later, we can return error.
@@ -105,13 +111,13 @@ func (h *DefaultHandler) Handle(ctx context.Context, r slog.Record) error {
 	return h.Handler.Handle(ctx, r)
 }
 
-func (c *DefaultHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+func (c *Handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	clone := c.clone()
 	clone.attrs = append(clone.attrs, attrs...)
 	return clone
 }
 
-func (c *DefaultHandler) clone() *DefaultHandler {
+func (c *Handler) clone() *Handler {
 	clone := *c
 	return &clone
 }

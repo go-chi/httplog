@@ -1,7 +1,7 @@
 # HTTP request logger
 
 - HTTP middleware that logs single structured log per request/response
-- Implements both frontend (`slog.Logger`) and backend (`slog.Handler`) separately to improve critical performance, so logging doesn't slow down HTTP response
+- Implements frontend (`slog.Logger`) and backend (`slog.Handler`) separately to improve critical performance of serving HTTP response
 - The provided backend `slog.Handler` is extensible and/or replaceable
 - Allows attaching log attributes to the single log line from within downstream HTTP handlers/middlewares
 
@@ -16,8 +16,8 @@
 
 	r := chi.NewRouter()
 
-	r.Use(httplog.RequestLogger(s.Log, &httplog.Options{
-		// Level 
+	r.Use(httplog.RequestLogger(logger, &httplog.Options{
+		// Level define the verbosity of the requests logs.
 		Level:         slog.LevelInfo,
 
         // Consise mode prints less information.

@@ -22,11 +22,7 @@ func NewRequestLogger(logger *slog.Logger, opts *Options) *Logger {
 		opts = &defaultOptions
 	}
 
-	handler := &DefaultHandler{
-		Handler: logger.Handler(),
-		level:   opts.Level,
-		opts:    opts,
-	}
+	handler := NewHandler(logger.Handler(), opts)
 
 	return &Logger{
 		Logger: slog.New(handler),
