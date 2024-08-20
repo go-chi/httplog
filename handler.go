@@ -15,6 +15,10 @@ type DefaultHandler struct {
 }
 
 func (h *DefaultHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	if log, ok := ctx.Value(logCtxKey{}).(*Log); ok {
+		return level >= log.Level
+	}
+
 	return level >= h.level
 }
 
@@ -26,16 +30,11 @@ func (h *DefaultHandler) Handle(ctx context.Context, r slog.Record) error {
 	}
 
 	if h.opts.Concise {
-		r.AddAttrs(slog.Any("request", slog.GroupValue(
-			slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.ReqHeaders)...)),
-		)))
+		r.AddAttrs(slog.Any("requestHeaders", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.ReqHeaders)...)))
 
 		if log.Resp != nil {
 			r.Message = fmt.Sprintf("HTTP %v (%v): %s %s", log.Resp.Status, log.Resp.Duration, log.Req.Method, log.Req.URL)
-
-			r.AddAttrs(slog.Any("response", slog.GroupValue(
-				slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.RespHeaders)...)),
-			)))
+			r.AddAttrs(slog.Any("responseHeaders", slog.GroupValue(getHeaderAttrs(log.Resp.Header(), h.opts.RespHeaders)...)))
 		} else {
 			r.Message = fmt.Sprintf("%s %s://%s%s", log.Req.Method, log.Req.Scheme, log.Req.Host, log.Req.URL)
 		}
