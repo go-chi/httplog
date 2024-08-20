@@ -47,7 +47,7 @@ type Options struct {
 	// This is useful if your console is too noisy during development.
 	Concise bool
 
-	// RecoverPanics recovers from panics caused in the underlying HTTP handlers
+	// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 	// and middlewares. It returns HTTP 500 unless response status was already set.
 	//
 	// NOTE: The request logger automatically logs all panics, regardless of this setting.
