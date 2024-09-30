@@ -364,7 +364,7 @@ func LogEntry(ctx context.Context) *slog.Logger {
 
 func LogEntrySetField(ctx context.Context, key string, value slog.Value) {
 	if entry, ok := ctx.Value(middleware.LogEntryCtxKey).(*RequestLoggerEntry); ok {
-		entry.Logger = entry.Logger.With(slog.Attr{Key: key, Value: value})
+		*entry.Logger = *entry.Logger.With(slog.Attr{Key: key, Value: value})
 	}
 }
 
@@ -376,6 +376,6 @@ func LogEntrySetFields(ctx context.Context, fields map[string]interface{}) {
 			attrs[i] = slog.Attr{Key: k, Value: slog.AnyValue(v)}
 			i++
 		}
-		entry.Logger = entry.Logger.With(attrs...)
+		*entry.Logger = *entry.Logger.With(attrs...)
 	}
 }
