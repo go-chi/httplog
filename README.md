@@ -14,9 +14,13 @@ A small but powerful structured logging package for HTTP request logging, built 
 
 See [_example/main.go](./_example/main.go). Try running it locally:
 ```sh
-$ ENV=production go run github.com/golang-cz/httplog/_example
+$ cd _example
 
-$ ENV=localhost go run github.com/golang-cz/httplog/_example
+# JSON logger
+$ ENV=production go run .
+
+# pretty logger
+$ ENV=localhost go run .
 ```
 
 ## Usage
@@ -64,7 +68,7 @@ func main() {
 		// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 		// and middlewares. It returns HTTP 500 unless response status was already set.
 		//
-		// NOTE: The request logger logs all panics automatically, regardless of this setting.
+		// NOTE: Panics are logged as errors automatically, regardless of this setting.
 		RecoverPanics: true,
 
 		// Select request/response headers to be logged explicitly.

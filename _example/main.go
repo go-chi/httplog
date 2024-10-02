@@ -62,7 +62,7 @@ func main() {
 		// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 		// and middlewares. It returns HTTP 500 unless response status was already set.
 		//
-		// NOTE: The request logger logs all panics automatically, regardless of this setting.
+		// NOTE: Panics are logged as errors automatically, regardless of this setting.
 		RecoverPanics: true,
 
 		// Select request/response headers to be logged explicitly.

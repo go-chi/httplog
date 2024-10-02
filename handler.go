@@ -37,13 +37,13 @@ func (h *Handler) Handle(ctx context.Context, rec slog.Record) error {
 		panic("use of httplog.DefaultHandler outside of context set by http.RequestLogger middleware")
 	}
 
-	if h.opts.LogRequestCURL {
-		rec.AddAttrs(slog.String("curl", log.curl()))
-	}
-
 	if h.opts.Concise {
 		reqAttrs := []slog.Attr{}
 		respAttrs := []slog.Attr{}
+
+		if log.LogRequestCURL {
+			reqAttrs = append(reqAttrs, slog.String("curl", log.curl()))
+		}
 
 		reqAttrs = append(reqAttrs, slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.LogRequestHeaders)...)))
 		if log.LogRequestBody && log.Resp != nil {
@@ -63,7 +63,7 @@ func (h *Handler) Handle(ctx context.Context, rec slog.Record) error {
 			rec.Message = fmt.Sprintf("%s %s://%s%s", log.Req.Method, log.scheme(), log.Req.Host, log.Req.URL)
 		}
 
-		if log.WW.Status() >= 400 {
+		if log.WW.Status() >= 400 || log.Level == slog.LevelDebug {
 			rec.AddAttrs(slog.Any("request", slog.GroupValue(reqAttrs...)))
 			rec.AddAttrs(slog.Any("response", slog.GroupValue(respAttrs...)))
 		}
@@ -77,12 +77,18 @@ func (h *Handler) Handle(ctx context.Context, rec slog.Record) error {
 			slog.String("proto", log.Req.Proto),
 			slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.LogRequestHeaders)...)),
 		}
+
+		if log.LogRequestCURL {
+			reqAttrs = append(reqAttrs, slog.String("curl", log.curl()))
+		}
+
 		if log.LogRequestBody && log.Resp != nil {
 			reqAttrs = append(reqAttrs, slog.String("body", log.ReqBody.String()))
 			if !log.ReqBodyFullyRead {
 				reqAttrs = append(reqAttrs, slog.Bool("bodyFullyRead", false))
 			}
 		}
+
 		rec.AddAttrs(slog.Any("request", slog.GroupValue(reqAttrs...)))
 
 		if log.Resp != nil {

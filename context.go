@@ -2,7 +2,6 @@ package httplog
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log/slog"
 )
@@ -17,7 +16,7 @@ func (c *logCtxKey) String() string {
 //
 // NOTE: Not safe for concurrent access. Don't use outside of HTTP request goroutine.
 func SetAttrs(ctx context.Context, attrs ...slog.Attr) {
-	log, ok := ctx.Value(logCtxKey{}).(*Log)
+	log, ok := ctx.Value(logCtxKey{}).(*log)
 	if !ok {
 		// Panic to stress test the use of this function. Later, we can return error.
 		panic("use of httplog.SetAttrs() outside of context set by httplog.RequestLogger")
@@ -30,7 +29,7 @@ func SetAttrs(ctx context.Context, attrs ...slog.Attr) {
 //
 // NOTE: Not safe for concurrent access. Don't use outside of HTTP request goroutine.
 func SetLevel(ctx context.Context, level slog.Level) {
-	log, ok := ctx.Value(logCtxKey{}).(*Log)
+	log, ok := ctx.Value(logCtxKey{}).(*log)
 	if !ok {
 		// Panic to stress test the use of this function. Later, we can return error.
 		panic("use of httplog.SetLevel() outside of context set by httplog.RequestLogger")
@@ -39,23 +38,22 @@ func SetLevel(ctx context.Context, level slog.Level) {
 }
 
 func LogRequestBody(ctx context.Context) {
-	log, ok := ctx.Value(logCtxKey{}).(*Log)
+	log, ok := ctx.Value(logCtxKey{}).(*log)
 	if !ok {
 		// Panic to stress test the use of this function. Later, we can return error.
-		panic("use of httplog.SetLevel() outside of context set by httplog.RequestLogger")
+		panic("use of httplog.LogRequestBody() outside of context set by httplog.RequestLogger")
 	}
 	if !log.LogRequestBody {
-		fmt.Println("doing it now...")
 		log.LogRequestBody = true
 		log.Req.Body = io.NopCloser(io.TeeReader(log.Req.Body, &log.ReqBody))
 	}
 }
 
 func LogResponseBody(ctx context.Context) {
-	log, ok := ctx.Value(logCtxKey{}).(*Log)
+	log, ok := ctx.Value(logCtxKey{}).(*log)
 	if !ok {
 		// Panic to stress test the use of this function. Later, we can return error.
-		panic("use of httplog.SetLevel() outside of context set by httplog.RequestLogger")
+		panic("use of httplog.LogResponseBody() outside of context set by httplog.RequestLogger")
 	}
 	if !log.LogResponseBody {
 		log.LogResponseBody = true

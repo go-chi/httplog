@@ -40,6 +40,8 @@ type Options struct {
 	// slog.LevelInfo  - log responses (excl. OPTIONS)
 	// slog.LevelWarn  - log 4xx and 5xx responses only (except for 429)
 	// slog.LevelError - log 5xx responses only
+	//
+	// Use httplog.SetLevel(ctx, slog.DebugLevel) to override the level per-request.
 	Level slog.Level
 
 	// Concise mode causes fewer log attributes to be printed in request logs.
@@ -47,40 +49,59 @@ type Options struct {
 	Concise bool
 
 	// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
-	// and middlewares. It returns HTTP 500 unless response status was already set.
+	// and middlewares and returns HTTP 500 unless response status was already set.
 	//
-	// NOTE: The request logger logs all panics automatically, regardless of this setting.
+	// NOTE: Panics are logged as errors automatically, regardless of this setting.
 	RecoverPanics bool
 
 	// LogRequestHeaders is an explicit list of headers to be logged as attributes.
+	// If not provided, the default headers are User-Agent, Referer and Origin.
 	LogRequestHeaders []string
 
 	// LogRequestBody enables logging of request body into a response log attribute.
+	//
+	// Use httplog.LogRequestBody(ctx) to enable on per-request basis instead.
 	LogRequestBody bool
 
+	// LogRequestCURL enables logging of request body incl. all headers as a CURL command.
+	//
+	// Use httplog.LogRequestCURL(ctx) to enable on per-request basis instead.
+	LogRequestCURL bool
+
 	// LogResponseHeaders is an explicit list of headers to be logged as attributes.
+	//
+	// If not provided, there are no default headers.
 	LogResponseHeaders []string
 
 	// LogResponseBody enables logging of response body into a response log attribute.
+	// The Content-Type of the response must match.
+	//
+	// Use httplog.LogResponseBody(ctx) to enable on per-request basis instead.
 	LogResponseBody bool
+
+	// LogResponseBodyContentType defines list of Content-Types for which LogResponseBody is enabled.
+	//
+	// If not provided, the default list is application/json and text/plain.
+	LogResponseBodyContentType []string
 }
 
 var defaultOptions = Options{
-	Level:              slog.LevelInfo,
-	Concise:            false,
-	RecoverPanics:      true,
-	LogRequestHeaders:  []string{"User-Agent", "Referer", "Origin"},
-	LogResponseHeaders: []string{""},
+	Level:                      slog.LevelInfo,
+	RecoverPanics:              true,
+	LogRequestHeaders:          []string{"User-Agent", "Referer", "Origin"},
+	LogResponseHeaders:         []string{""},
+	LogResponseBodyContentType: []string{"application/json", "text/plain"},
 }
 
 func (l *Logger) Handle(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		log := &Log{
+		log := &log{
 			Level:           l.opts.Level,
 			Req:             r,
-			LogRequestBody:  l.opts.LogRequestBody,
+			LogRequestCURL:  l.opts.LogRequestCURL,
+			LogRequestBody:  l.opts.LogRequestBody || l.opts.LogRequestCURL,
 			LogResponseBody: l.opts.LogResponseBody,
 		}
 
@@ -121,7 +142,7 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 
 			status := ww.Status()
 
-			log.Resp = &ResponseLog{
+			log.Resp = &respLog{
 				Header:   w.Header,
 				Duration: time.Since(start),
 			}
@@ -153,24 +174,27 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 	})
 }
 
-type Log struct {
-	Level           slog.Level  // Use httplog.SetLevel(ctx, slog.DebugLevel) to override level
-	Attrs           []slog.Attr // Use httplog.SetAttrs(ctx, slog.String("key", "value")) to append
-	LogRequestBody  bool        // Use httplog.LogRequestBody(ctx) to force-enable
-	LogResponseBody bool        // Use httplog.LogResponseBody(ctx) to force-enable
+type log struct {
+	Level           slog.Level
+	Attrs           []slog.Attr
+	LogRequestCURL  bool
+	LogRequestBody  bool
+	LogResponseBody bool
 
-	// Fields automatically set by httplog.RequestLogger middleware:
+	// Fields set by httplog.RequestLogger middleware:
 	Req              *http.Request
 	ReqBody          bytes.Buffer
 	ReqBodyFullyRead bool
 	WW               middleware.WrapResponseWriter
-	Resp             *ResponseLog
+	Resp             *respLog
 	RespBody         bytes.Buffer
 	Panic            any
 	PanicPC          []uintptr
+
+	// Fields internal to httplog:
 }
 
-type ResponseLog struct {
+type respLog struct {
 	Header   func() http.Header
 	Duration time.Duration
 }
