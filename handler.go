@@ -23,7 +23,7 @@ func NewHandler(handler slog.Handler, opts *Options) *Handler {
 }
 
 func (h *Handler) Enabled(ctx context.Context, level slog.Level) bool {
-	if log, ok := ctx.Value(logCtxKey{}).(*Log); ok {
+	if log, ok := ctx.Value(logCtxKey{}).(*log); ok {
 		return level >= log.Level
 	}
 
@@ -31,40 +31,46 @@ func (h *Handler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (h *Handler) Handle(ctx context.Context, rec slog.Record) error {
-	log, ok := ctx.Value(logCtxKey{}).(*Log)
+	log, ok := ctx.Value(logCtxKey{}).(*log)
 	if !ok {
 		// Panic to stress test the use of this handler. Later, we can return error.
 		panic("use of httplog.DefaultHandler outside of context set by http.RequestLogger middleware")
 	}
 
-	// r := log.Req
-
-	scheme := "http"
-	if log.Req.TLS != nil {
-		scheme = "https"
+	if h.opts.LogRequestCURL {
+		rec.AddAttrs(slog.String("curl", log.curl()))
 	}
 
 	if h.opts.Concise {
-		rec.AddAttrs(slog.Any("requestHeaders", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.LogRequestHeaders)...)))
+		reqAttrs := []slog.Attr{}
+		respAttrs := []slog.Attr{}
+
+		reqAttrs = append(reqAttrs, slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Req.Header, h.opts.LogRequestHeaders)...)))
 		if log.LogRequestBody && log.Resp != nil {
-			rec.AddAttrs(slog.String("requestBody", log.ReqBody.String()))
+			reqAttrs = append(reqAttrs, slog.String("body", log.ReqBody.String()))
 			if !log.ReqBodyFullyRead {
-				rec.AddAttrs(slog.Bool("requestBodyFullyRead", false))
+				reqAttrs = append(reqAttrs, slog.Bool("bodyFullyRead", false))
 			}
 		}
 
 		if log.Resp != nil {
-			rec.Message = fmt.Sprintf("HTTP %v (%v): %s %s", log.WW.Status(), log.Resp.Duration, log.Req.Method, log.Req.URL)
-			rec.AddAttrs(slog.Any("responseHeaders", slog.GroupValue(getHeaderAttrs(log.Resp.Header(), h.opts.LogResponseHeaders)...)))
+			rec.Message = fmt.Sprintf("%s %s => HTTP %v (%v)", log.Req.Method, log.Req.URL, log.WW.Status(), log.Resp.Duration)
+			respAttrs = append(respAttrs, slog.Any("headers", slog.GroupValue(getHeaderAttrs(log.Resp.Header(), h.opts.LogResponseHeaders)...)))
 			if log.LogResponseBody {
-				rec.AddAttrs(slog.String("responseBody", log.RespBody.String()))
+				respAttrs = append(respAttrs, slog.String("body", log.RespBody.String()))
 			}
 		} else {
-			rec.Message = fmt.Sprintf("%s %s://%s%s", log.Req.Method, scheme, log.Req.Host, log.Req.URL)
+			rec.Message = fmt.Sprintf("%s %s://%s%s", log.Req.Method, log.scheme(), log.Req.Host, log.Req.URL)
 		}
+
+		if log.WW.Status() >= 400 {
+			rec.AddAttrs(slog.Any("request", slog.GroupValue(reqAttrs...)))
+			rec.AddAttrs(slog.Any("response", slog.GroupValue(respAttrs...)))
+		}
+
 	} else {
 		reqAttrs := []slog.Attr{
-			slog.String("url", fmt.Sprintf("%s://%s%s", scheme, log.Req.Host, log.Req.URL)),
+			slog.String("url", fmt.Sprintf("%s://%s%s", log.scheme(), log.Req.Host, log.Req.URL)),
 			slog.String("method", log.Req.Method),
 			slog.String("path", log.Req.URL.Path),
 			slog.String("remoteIp", log.Req.RemoteAddr),
