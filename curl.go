@@ -2,11 +2,11 @@ package httplog
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 )
 
-func (l *log) curl() string {
-	var r = l.Req
+func curl(r *http.Request, reqBody string) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "curl")
@@ -14,10 +14,10 @@ func (l *log) curl() string {
 		fmt.Fprintf(&b, " -X %s", r.Method)
 	}
 
-	fmt.Fprintf(&b, " %s", singleQuoted(fmt.Sprintf("%s://%s%s", l.scheme(), r.Host, r.URL)))
+	fmt.Fprintf(&b, " %s", singleQuoted(fullURL(r)))
 
 	if r.Method == "POST" {
-		fmt.Fprintf(&b, " --data-raw %s", singleQuoted(l.ReqBody.String()))
+		fmt.Fprintf(&b, " --data-raw %s", singleQuoted(reqBody))
 	}
 
 	for name, vals := range r.Header {
@@ -29,13 +29,15 @@ func (l *log) curl() string {
 	return b.String()
 }
 
-func (l *log) scheme() string {
-	if l.Req.TLS != nil {
-		return "https"
-	}
-	return "http"
-}
-
 func singleQuoted(v string) string {
 	return fmt.Sprintf("'%s'", strings.ReplaceAll(v, "'", `'\''`))
+}
+
+func fullURL(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+
+	return fmt.Sprintf("%s://%s%s", scheme, r.Host, r.URL)
 }
