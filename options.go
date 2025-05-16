@@ -66,6 +66,9 @@ type Options struct {
 	// ResponseHeaders enables logging of all response headers.
 	ResponseHeaders bool
 
+	// HideRequestQueryParams will clean query params from the list
+	HideRequestQueryParams []string
+
 	// QuietDownRoutes are routes which are temporarily excluded from logging for a QuietDownPeriod after it occurs
 	// for the first time
 	// to cancel noise from logging for routes that are known to be noisy.
@@ -139,6 +142,11 @@ func (l *Logger) Configure(opts Options) {
 	// Pre-downcase all SkipHeaders
 	for i, header := range opts.HideRequestHeaders {
 		opts.HideRequestHeaders[i] = strings.ToLower(header)
+	}
+
+	// Pre-downcase all SkipQueryParams
+	for i, param := range opts.HideRequestQueryParams {
+		opts.HideRequestQueryParams[i] = strings.ToLower(param)
 	}
 
 	l.Options = opts

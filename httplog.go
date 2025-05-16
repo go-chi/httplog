@@ -233,7 +233,35 @@ func requestLogFields(r *http.Request, options Options, requestHeaders bool) slo
 	if r.TLS != nil {
 		scheme = "https"
 	}
-	requestURL := fmt.Sprintf("%s://%s%s", scheme, r.Host, r.RequestURI)
+
+	requestUri := r.RequestURI
+	if len(options.HideRequestQueryParams) > 0 {
+		q := r.URL.Query()
+		path := r.URL.Path
+
+		queryParts := make([]string, 0, len(q))
+
+		sensitive := map[string]struct{}{}
+		for _, param := range options.HideRequestQueryParams {
+			sensitive[strings.ToLower(param)] = struct{}{}
+		}
+
+		for key, values := range q {
+			val := values[0]
+			if _, hide := sensitive[strings.ToLower(key)]; hide {
+				val = "***"
+			}
+			queryParts = append(queryParts, fmt.Sprintf("%s=%s", key, val))
+		}
+
+		if len(queryParts) > 0 {
+			requestUri = fmt.Sprintf("%s?%s", path, strings.Join(queryParts, "&"))
+		} else {
+			requestUri = path
+		}
+	}
+
+	requestURL := fmt.Sprintf("%s://%s%s", scheme, r.Host, requestUri)
 
 	requestFields := []any{
 		slog.Attr{Key: "url", Value: slog.StringValue(requestURL)},
@@ -242,6 +270,7 @@ func requestLogFields(r *http.Request, options Options, requestHeaders bool) slo
 		slog.Attr{Key: "remoteIP", Value: slog.StringValue(r.RemoteAddr)},
 		slog.Attr{Key: "proto", Value: slog.StringValue(r.Proto)},
 	}
+
 	if reqID := middleware.GetReqID(r.Context()); reqID != "" {
 		requestFields = append(requestFields, slog.Attr{Key: "requestID", Value: slog.StringValue(reqID)})
 	}
@@ -266,6 +295,7 @@ func requestLogFields(r *http.Request, options Options, requestHeaders bool) slo
 func headerLogField(header http.Header, options Options) []slog.Attr {
 	headerField := []slog.Attr{}
 	for k, v := range header {
+		fmt.Printf("X1: %s -> %v", k, v)
 		k = strings.ToLower(k)
 		switch {
 		case len(v) == 0:
