@@ -136,8 +136,6 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				}
 
 				if o.LogResponseBody {
-					ww.Tee(&resBody)
-
 					if slices.Contains(o.LogResponseBodyContentType, ww.Header().Get("content-type")) {
 						resAttrs = append(resAttrs, slog.String("body", resBody.String()))
 					}
