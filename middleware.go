@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	loga "log"
 	"log/slog"
 	"net/http"
 	"runtime"
@@ -71,7 +70,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					}
 
 					logAttrs = append(logAttrs,
-						slog.Any("panic", loga.Panic),
+						slog.Any("panic", rec),
 						slog.Any("panicStack", stackValues),
 					)
 				}
