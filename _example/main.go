@@ -25,8 +25,8 @@ func main() {
 		slog.String("env", "production"),
 	)
 
-	isLocalhost := os.Getenv("ENV") == "localhost"
-	if isLocalhost {
+	debug := os.Getenv("ENV") == "localhost"
+	if debug {
 		// Pretty logger for localhost development.
 		logger = slog.New(devslog.NewHandler(os.Stdout, &devslog.Options{
 			SortKeys:           true,
@@ -57,7 +57,7 @@ func main() {
 
 		// Concise mode causes fewer log attributes to be printed in request logs.
 		// This is useful if your console is too noisy during development.
-		Concise: isLocalhost,
+		Concise: debug,
 
 		// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 		// and middlewares. It returns HTTP 500 unless response status was already set.
@@ -70,8 +70,8 @@ func main() {
 		LogResponseHeaders: []string{traceid.Header},
 
 		// You can log request/request body. Useful for debugging.
-		LogRequestBody:  false,
-		LogResponseBody: false,
+		LogRequestBody:  debug,
+		LogResponseBody: debug,
 	}))
 
 	r.Use(func(next http.Handler) http.Handler {
@@ -137,9 +137,11 @@ func main() {
 		w.Write([]byte(`{"response": "payload"}`))
 	})
 
-	fmt.Println("Enable pretty logs with:")
-	fmt.Println("  ENV=localhost go run ./")
-	fmt.Println()
+	if !debug {
+		fmt.Println("Enable pretty logs with:")
+		fmt.Println("  ENV=localhost go run ./")
+		fmt.Println()
+	}
 	fmt.Println("Try these commands from a new terminal window:")
 	fmt.Println("  curl -v http://localhost:8000")
 	fmt.Println("  curl -v http://localhost:8000/panic")

@@ -14,7 +14,7 @@ func curl(r *http.Request, reqBody string) string {
 		fmt.Fprintf(&b, " -X %s", r.Method)
 	}
 
-	fmt.Fprintf(&b, " %s", singleQuoted(fullURL(r)))
+	fmt.Fprintf(&b, " %s", singleQuoted(requestURL(r)))
 
 	if r.Method == "POST" {
 		fmt.Fprintf(&b, " --data-raw %s", singleQuoted(reqBody))
@@ -33,7 +33,7 @@ func singleQuoted(v string) string {
 	return fmt.Sprintf("'%s'", strings.ReplaceAll(v, "'", `'\''`))
 }
 
-func fullURL(r *http.Request) string {
+func requestURL(r *http.Request) string {
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"

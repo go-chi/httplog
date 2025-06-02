@@ -93,21 +93,22 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					return
 				}
 
-				if o.LogRequestBody {
-					// Ensure the request body is fully read if the underlying HTTP handler didn't do so.
-					n, _ := io.Copy(io.Discard, r.Body)
-					if n > 0 {
-						logAttrs = append(logAttrs, slog.Any("request.bytes.unread", n))
-					}
-				}
-
 				// Request attributes
 				reqAttrs := []slog.Attr{
 					slog.Any("headers", slog.GroupValue(getHeaderAttrs(r.Header, o.LogRequestHeaders)...)),
 				}
+
+				if o.LogRequestBody {
+					// Ensure the request body is fully read if the underlying HTTP handler didn't do so.
+					n, _ := io.Copy(io.Discard, r.Body)
+					if n > 0 {
+						reqAttrs = append(reqAttrs, slog.Any("request.bytes.unread", n))
+					}
+				}
+
 				if !o.Concise {
 					reqAttrs = append(reqAttrs,
-						slog.String("url", fullURL(r)),
+						slog.String("url", requestURL(r)),
 						slog.String("method", r.Method),
 						slog.String("path", r.URL.Path),
 						slog.String("remoteIp", r.RemoteAddr),
