@@ -97,12 +97,27 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				reqAttrs := []slog.Attr{
 					slog.Any("headers", slog.GroupValue(getHeaderAttrs(r.Header, o.LogRequestHeaders)...)),
 				}
-
 				if o.LogRequestBody {
 					// Ensure the request body is fully read if the underlying HTTP handler didn't do so.
 					n, _ := io.Copy(io.Discard, r.Body)
 					if n > 0 {
 						reqAttrs = append(reqAttrs, slog.Any("request.bytes.unread", n))
+					}
+				}
+				if o.LogRequestCURL {
+					reqAttrs = append(reqAttrs, slog.String("curl", curl(r, reqBody.String())))
+				}
+				if o.LogRequestBody {
+					reqAttrs = append(reqAttrs, slog.String("body", reqBody.String()))
+				}
+
+				// Response attributes
+				respAttrs := []slog.Attr{
+					slog.Any("headers", slog.GroupValue(getHeaderAttrs(ww.Header(), o.LogResponseHeaders)...)),
+				}
+				if o.LogResponseBody {
+					if slices.Contains(o.LogResponseBodyContentType, ww.Header().Get("content-type")) {
+						respAttrs = append(respAttrs, slog.String("body", resBody.String()))
 					}
 				}
 
@@ -114,39 +129,16 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 						slog.String("remoteIp", r.RemoteAddr),
 						slog.String("proto", r.Proto),
 					)
-				}
-
-				if o.LogRequestCURL {
-					reqAttrs = append(reqAttrs, slog.String("curl", curl(r, reqBody.String())))
-				}
-
-				if o.LogRequestBody {
-					reqAttrs = append(reqAttrs, slog.String("body", reqBody.String()))
-				}
-
-				// Response attributes
-				resAttrs := []slog.Attr{
-					slog.Any("headers", slog.GroupValue(getHeaderAttrs(ww.Header(), o.LogResponseHeaders)...)),
-				}
-				if !o.Concise {
-					resAttrs = append(resAttrs,
+					respAttrs = append(respAttrs,
 						slog.Int("status", statusCode),
 						slog.Float64("duration", float64(duration.Milliseconds())),
 						slog.Int("bytes", ww.BytesWritten()),
 					)
 				}
 
-				if o.LogResponseBody {
-					if slices.Contains(o.LogResponseBodyContentType, ww.Header().Get("content-type")) {
-						resAttrs = append(resAttrs, slog.String("body", resBody.String()))
-					}
-				}
-
-				if !o.Concise || statusCode >= 400 || o.Level < slog.LevelInfo {
-					logAttrs = append(logAttrs, slog.Any("request", slog.GroupValue(reqAttrs...)))
-					logAttrs = append(logAttrs, slog.Any("response", slog.GroupValue(resAttrs...)))
-					logAttrs = append(logAttrs, getAttrs(ctx)...)
-				}
+				logAttrs = append(logAttrs, slog.Any("request", slog.GroupValue(reqAttrs...)))
+				logAttrs = append(logAttrs, slog.Any("response", slog.GroupValue(respAttrs...)))
+				logAttrs = append(logAttrs, getAttrs(ctx)...)
 
 				msg := fmt.Sprintf("%s %s => HTTP %v (%v)", r.Method, r.URL, statusCode, duration)
 				logger.LogAttrs(ctx, lvl, msg, logAttrs...)
