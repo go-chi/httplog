@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime"
-	"slices"
 	"strings"
 	"time"
 
@@ -18,6 +17,12 @@ import (
 func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Handler {
 	if o == nil {
 		o = &defaultOptions
+	}
+	if len(o.LogBodyContentTypes) == 0 {
+		o.LogBodyContentTypes = defaultOptions.LogBodyContentTypes
+	}
+	if o.LogBodyMaxLen == 0 {
+		o.LogBodyMaxLen = defaultOptions.LogBodyMaxLen
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -31,9 +36,9 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
-			var resBody bytes.Buffer
+			var respBody bytes.Buffer
 			if o.LogResponseBody {
-				ww.Tee(&resBody)
+				ww.Tee(&respBody)
 			}
 
 			start := time.Now()
@@ -108,7 +113,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					reqAttrs = append(reqAttrs, slog.String("curl", curl(r, reqBody.String())))
 				}
 				if o.LogRequestBody {
-					reqAttrs = append(reqAttrs, slog.String("body", reqBody.String()))
+					reqAttrs = append(reqAttrs, slog.String("body", logBody(&reqBody, r.Header, o)))
 				}
 				if !o.Concise {
 					reqAttrs = append(reqAttrs,
@@ -125,9 +130,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					slog.Any("headers", slog.GroupValue(getHeaderAttrs(ww.Header(), o.LogResponseHeaders)...)),
 				}
 				if o.LogResponseBody {
-					if slices.Contains(o.LogResponseBodyContentType, ww.Header().Get("content-type")) {
-						respAttrs = append(respAttrs, slog.String("body", resBody.String()))
-					}
+					respAttrs = append(respAttrs, slog.String("body", logBody(&respBody, ww.Header(), o)))
 				}
 
 				if !o.Concise {
@@ -162,4 +165,19 @@ func getHeaderAttrs(header http.Header, headers []string) []slog.Attr {
 		}
 	}
 	return attrs
+}
+
+func logBody(body *bytes.Buffer, header http.Header, o *Options) string {
+	if body.Len() == 0 {
+		return ""
+	}
+	for _, contentType := range o.LogBodyContentTypes {
+		if strings.HasPrefix(header.Get("Content-Type"), contentType) {
+			if o.LogBodyMaxLen <= 0 || o.LogBodyMaxLen >= body.Len() {
+				return body.String()
+			}
+			return body.String()[:o.LogBodyMaxLen] + "... [trimmed]"
+		}
+	}
+	return "[redacted]"
 }

@@ -69,8 +69,9 @@ func main() {
 
 		// You can log request/request body. Useful for debugging.
 		LogRequestBody:  prettyLogs,
-		LogRequestCURL:  false,
 		LogResponseBody: prettyLogs,
+
+		LogBodyContentTypes: []string{"application/json"},
 	}))
 
 	r.Use(func(next http.Handler) http.Handler {
