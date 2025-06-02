@@ -68,8 +68,8 @@ func main() {
 		LogResponseHeaders: []string{},
 
 		// You can log request/request body conditionally. Useful for debugging.
-		LogRequestBody:  hasDebugHeader,
-		LogResponseBody: hasDebugHeader,
+		LogRequestBody:  isDebugHeaderSet,
+		LogResponseBody: isDebugHeaderSet,
 	}))
 
 	r.Use(func(next http.Handler) http.Handler {
@@ -150,7 +150,7 @@ func main() {
 	fmt.Println("  curl -v http://localhost:8000/warn")
 	fmt.Println("  curl -v http://localhost:8000/err")
 	fmt.Println(`  curl -v http://localhost:8000/body -X POST --json '{"data": "some data"}'`)
-	fmt.Println(`  curl -v http://localhost:8000/body -X POST --json '{"data": "some data"}' -H "Debug: secret:changemenow"`)
+	fmt.Println(`  curl -v http://localhost:8000/body -X POST --json '{"data": "some data"}' -H "Debug: reveal-logs"`)
 	fmt.Println()
 
 	if err := http.ListenAndServe("localhost:8000", r); err != http.ErrAbortHandler {
@@ -172,6 +172,6 @@ func getLogHandler(pretty bool) slog.Handler {
 	return slog.NewJSONHandler(os.Stdout, nil)
 }
 
-func hasDebugHeader(r *http.Request) bool {
-	return r.Header.Get("Debug") == "secret:changemenow"
+func isDebugHeaderSet(r *http.Request) bool {
+	return r.Header.Get("Debug") == "reveal-logs"
 }
