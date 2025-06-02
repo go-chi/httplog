@@ -105,12 +105,12 @@ func (l *Logger) Handle(next http.Handler) http.Handler {
 			LogResponseBody: l.opts.LogResponseBody,
 		}
 
-		ctx = context.WithValue(ctx, logCtxKey{}, log)
-		l.DebugContext(ctx, "Request started")
-
 		start := time.Now()
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 		log.WW = ww
+
+		ctx = context.WithValue(ctx, logCtxKey{}, log)
+		l.DebugContext(ctx, "Request started")
 
 		if log.LogRequestBody {
 			r.Body = io.NopCloser(io.TeeReader(r.Body, &log.ReqBody))
