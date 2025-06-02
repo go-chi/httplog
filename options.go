@@ -58,7 +58,7 @@ type Options struct {
 var defaultOptions = Options{
 	Level:                      slog.LevelInfo,
 	RecoverPanics:              true,
-	LogRequestHeaders:          []string{"User-Agent", "Referer", "Origin"},
-	LogResponseHeaders:         []string{""},
+	LogRequestHeaders:          []string{"Content-Type", "User-Agent", "Referer", "Origin"},
+	LogResponseHeaders:         []string{"Content-Type"},
 	LogResponseBodyContentType: []string{"application/json", "text/plain"},
 }
