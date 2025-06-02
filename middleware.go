@@ -110,6 +110,15 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				if o.LogRequestBody {
 					reqAttrs = append(reqAttrs, slog.String("body", reqBody.String()))
 				}
+				if !o.Concise {
+					reqAttrs = append(reqAttrs,
+						slog.String("url", requestURL(r)),
+						slog.String("method", r.Method),
+						slog.String("path", r.URL.Path),
+						slog.String("remoteIp", r.RemoteAddr),
+						slog.String("proto", r.Proto),
+					)
+				}
 
 				// Response attributes
 				respAttrs := []slog.Attr{
@@ -122,13 +131,6 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				}
 
 				if !o.Concise {
-					reqAttrs = append(reqAttrs,
-						slog.String("url", requestURL(r)),
-						slog.String("method", r.Method),
-						slog.String("path", r.URL.Path),
-						slog.String("remoteIp", r.RemoteAddr),
-						slog.String("proto", r.Proto),
-					)
 					respAttrs = append(respAttrs,
 						slog.Int("status", statusCode),
 						slog.Float64("duration", float64(duration.Milliseconds())),

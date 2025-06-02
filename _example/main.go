@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -16,23 +18,19 @@ import (
 )
 
 func main() {
-	// JSON logger for production.
-	// For localhost development, you can replace it with slog.NewTextHandler()
-	// or with a pretty logger like github.com/golang-cz/devslog.
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With(
-		slog.String("app", "example-app"),
-		slog.String("version", "v1.0.0-a1fa420"),
-		slog.String("env", "production"),
-	)
+	prettyLogs := os.Getenv("ENV") == "localhost"
 
-	debug := os.Getenv("ENV") == "localhost"
-	if debug {
-		// Pretty logger for localhost development.
-		logger = slog.New(devslog.NewHandler(os.Stdout, &devslog.Options{
-			SortKeys:           true,
-			MaxErrorStackTrace: 5,
-			MaxSlicePrintSize:  20,
-		}))
+	logHandler := getLogHandler(prettyLogs)
+	logHandler = traceid.LogHandler(logHandler) // Add "traceId" to all logs, if available in ctx.
+
+	logger := slog.New(logHandler)
+
+	if !prettyLogs {
+		logger = logger.With(
+			slog.String("app", "example-app"),
+			slog.String("version", "v1.0.0-a1fa420"),
+			slog.String("env", "production"),
+		)
 	}
 
 	// Set as a default logger for both slog and log.
@@ -57,7 +55,7 @@ func main() {
 
 		// Concise mode causes fewer log attributes to be printed in request logs.
 		// This is useful if your console is too noisy during development.
-		Concise: debug,
+		Concise: prettyLogs,
 
 		// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 		// and middlewares. It returns HTTP 500 unless response status was already set.
@@ -66,12 +64,13 @@ func main() {
 		RecoverPanics: true,
 
 		// Select request/response headers to be logged explicitly.
-		LogRequestHeaders:  []string{"User-Agent", "Origin", "Referer", traceid.Header},
-		LogResponseHeaders: []string{traceid.Header},
+		LogRequestHeaders:  []string{"User-Agent", "Origin", "Referer"},
+		LogResponseHeaders: []string{},
 
 		// You can log request/request body. Useful for debugging.
-		LogRequestBody:  debug,
-		LogResponseBody: debug,
+		LogRequestBody:  prettyLogs,
+		LogRequestCURL:  false,
+		LogResponseBody: prettyLogs,
 	}))
 
 	r.Use(func(next http.Handler) http.Handler {
@@ -128,31 +127,57 @@ func main() {
 		ctx := r.Context()
 		_ = ctx
 
+		var payload struct {
+			Data string `json:"data"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			w.WriteHeader(400)
+			w.Write([]byte(fmt.Sprintf(`{"error": "%v"}`, err)))
+			return
+		}
+
 		// Log request/response bodies for Admin requests.
 		if r.Header.Get("Authorization") == "Bearer ADMIN-SECRET" {
 			// logger.LogRequestBody(ctx)
 			// logger.LogResponseBody(ctx)
 		}
 
-		w.Write([]byte(`{"response": "payload"}`))
+		payload.Data = strings.ToUpper(payload.Data)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(payload)
 	})
 
-	if !debug {
+	if !prettyLogs {
 		fmt.Println("Enable pretty logs with:")
 		fmt.Println("  ENV=localhost go run ./")
 		fmt.Println()
 	}
+
 	fmt.Println("Try these commands from a new terminal window:")
 	fmt.Println("  curl -v http://localhost:8000")
 	fmt.Println("  curl -v http://localhost:8000/panic")
 	fmt.Println("  curl -v http://localhost:8000/info")
 	fmt.Println("  curl -v http://localhost:8000/warn")
 	fmt.Println("  curl -v http://localhost:8000/err")
-	fmt.Println(`  curl -v http://localhost:8000/body -X POST --data '{"request": "data"}'`)
-	fmt.Println(`  curl -v http://localhost:8000/body -X POST --data '{"request": "data"}' -H "Authorization: Bearer ADMIN-SECRET"`)
+	fmt.Println(`  curl -v http://localhost:8000/body -X POST --json '{"data": "some data"}'`)
+	fmt.Println(`  curl -v http://localhost:8000/body -X POST --json '{"data": "some data"}' -H "Authorization: Bearer ADMIN-SECRET"`)
 	fmt.Println()
 
 	if err := http.ListenAndServe("localhost:8000", r); err != http.ErrAbortHandler {
 		log.Fatal(err)
 	}
+}
+
+func getLogHandler(pretty bool) slog.Handler {
+	if pretty {
+		// Pretty logs for localhost development.
+		return devslog.NewHandler(os.Stdout, &devslog.Options{
+			SortKeys:           true,
+			MaxErrorStackTrace: 5,
+			MaxSlicePrintSize:  20,
+		})
+	}
+
+	// JSON logs for production.
+	return slog.NewJSONHandler(os.Stdout, nil)
 }
