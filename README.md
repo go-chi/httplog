@@ -71,13 +71,13 @@ func main() {
 		// NOTE: Panics are logged as errors automatically, regardless of this setting.
 		RecoverPanics: true,
 
-		// Select request/response headers to be logged explicitly.
+		// Log selected request/response headers explicitly.
 		LogRequestHeaders:  []string{"User-Agent", "Origin", "Referer"},
 		LogResponseHeaders: []string{},
 
-		// You can log request/request body. Useful for debugging.
-		LogRequestBody:  false,
-		LogResponseBody: false,
+		// Log request/request body. Useful for debugging.
+		LogRequestBody:  hasDebugHeader,
+		LogResponseBody: hasDebugHeader,
 	}))
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -90,6 +90,10 @@ func main() {
 	})
 
 	http.ListenAndServe("localhost:8000", r)
+}
+
+func hasDebugHeader(r *http.Request) bool {
+	return r.Header.Get("Debug") == "secret:changemenow"
 }
 ```
 

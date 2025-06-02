@@ -18,14 +18,14 @@ import (
 )
 
 func main() {
-	prettyLogs := os.Getenv("ENV") == "localhost"
+	isLocalhost := os.Getenv("ENV") == "localhost"
 
-	logHandler := getLogHandler(prettyLogs)
+	logHandler := getLogHandler(isLocalhost)
 	logHandler = traceid.LogHandler(logHandler) // Add "traceId" to all logs, if available in ctx.
 
 	logger := slog.New(logHandler)
 
-	if !prettyLogs {
+	if !isLocalhost {
 		logger = logger.With(
 			slog.String("app", "example-app"),
 			slog.String("version", "v1.0.0-a1fa420"),
@@ -55,7 +55,7 @@ func main() {
 
 		// Concise mode causes fewer log attributes to be printed in request logs.
 		// This is useful if your console is too noisy during development.
-		Concise: prettyLogs,
+		Concise: isLocalhost,
 
 		// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 		// and middlewares. It returns HTTP 500 unless response status was already set.
@@ -68,11 +68,8 @@ func main() {
 		LogResponseHeaders: []string{},
 
 		// You can log request/request body conditionally. Useful for debugging.
-		LogRequestCURL:  hasDebugHeader,
 		LogRequestBody:  hasDebugHeader,
 		LogResponseBody: hasDebugHeader,
-
-		LogBodyContentTypes: []string{"application/json"},
 	}))
 
 	r.Use(func(next http.Handler) http.Handler {
@@ -140,7 +137,7 @@ func main() {
 		json.NewEncoder(w).Encode(payload)
 	})
 
-	if !prettyLogs {
+	if !isLocalhost {
 		fmt.Println("Enable pretty logs with:")
 		fmt.Println("  ENV=localhost go run ./")
 		fmt.Println()
@@ -153,7 +150,7 @@ func main() {
 	fmt.Println("  curl -v http://localhost:8000/warn")
 	fmt.Println("  curl -v http://localhost:8000/err")
 	fmt.Println(`  curl -v http://localhost:8000/body -X POST --json '{"data": "some data"}'`)
-	fmt.Println(`  curl -v http://localhost:8000/body -X POST --json '{"data": "some data"}' -H "Debug: body"`)
+	fmt.Println(`  curl -v http://localhost:8000/body -X POST --json '{"data": "some data"}' -H "Debug: secret:changemenow"`)
 	fmt.Println()
 
 	if err := http.ListenAndServe("localhost:8000", r); err != http.ErrAbortHandler {
@@ -176,5 +173,5 @@ func getLogHandler(pretty bool) slog.Handler {
 }
 
 func hasDebugHeader(r *http.Request) bool {
-	return r.Header.Get("Debug") == "body"
+	return r.Header.Get("Debug") == "secret:changemenow"
 }

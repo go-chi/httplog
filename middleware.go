@@ -29,12 +29,12 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := context.WithValue(r.Context(), ctxKeyLogAttrs{}, &[]slog.Attr{})
 
-			logReqCURL := o.LogRequestCURL != nil && o.LogRequestCURL(r)
 			logReqBody := o.LogRequestBody != nil && o.LogRequestBody(r)
 			logRespBody := o.LogResponseBody != nil && o.LogResponseBody(r)
+			logReqCURL := o.LogRequestAsCURL != nil && o.LogRequestAsCURL(r)
 
 			var reqBody bytes.Buffer
-			if logReqCURL || logReqBody {
+			if logReqBody || logReqCURL {
 				r.Body = io.NopCloser(io.TeeReader(r.Body, &reqBody))
 			}
 
@@ -113,11 +113,11 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 						reqAttrs = append(reqAttrs, slog.Any("request.bytes.unread", n))
 					}
 				}
-				if logReqCURL {
-					reqAttrs = append(reqAttrs, slog.String("curl", curl(r, reqBody.String())))
-				}
 				if logReqBody {
 					reqAttrs = append(reqAttrs, slog.String("body", logBody(&reqBody, r.Header, o)))
+				}
+				if logReqCURL {
+					reqAttrs = append(reqAttrs, slog.String("curl", curl(r, reqBody.String())))
 				}
 				if !o.Concise {
 					reqAttrs = append(reqAttrs,

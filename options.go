@@ -25,32 +25,35 @@ type Options struct {
 	// NOTE: Panics are logged as errors automatically, regardless of this setting.
 	RecoverPanics bool
 
-	// LogRequestHeaders is an explicit list of headers to be logged as attributes.
-	// If not provided, the default headers are User-Agent, Referer and Origin.
+	// LogRequestHeaders is a list of headers to be logged as attributes.
+	// If not provided, the default is ["Content-Type", "User-Agent", "Referer", "Origin"].
+	//
+	// WARNING: Do not leak any request headers with sensitive information.
 	LogRequestHeaders []string
 
-	// LogRequestBody enables logging of request body. Useful for debugging.
+	// LogRequestBody is an optional predicate function that controls logging of request body.
 	//
-	// Use httplog.LogRequestBody(ctx) to enable on per-request basis instead.
+	// If the function returns true, the request body will be logged.
+	// If false, no request body will be logged.
+	//
+	// WARNING: Do not leak any request bodies with sensitive information.
 	LogRequestBody func(req *http.Request) bool
 
-	// LogRequestCURL enables logging of request body incl. all headers as a CURL command.
-	//
-	// Use httplog.LogRequestCURL(ctx) to enable on per-request basis instead.
-	LogRequestCURL func(req *http.Request) bool
-
-	// LogResponseHeaders is an explicit list of headers to be logged as attributes.
+	// LogResponseHeaders controls a list of headers to be logged as attributes.
 	//
 	// If not provided, there are no default headers.
 	LogResponseHeaders []string
 
-	// LogResponseBody enables logging of response body. Useful for debugging.
+	// LogRequestBody is an optional predicate function that controls logging of request body.
 	//
-	// Use httplog.LogResponseBody(ctx) to enable on per-request basis instead.
+	// If the function returns true, the request body will be logged.
+	// If false, no request body will be logged.
+	//
+	// WARNING: Do not leak any response bodies with sensitive information.
 	LogResponseBody func(req *http.Request) bool
 
 	// LogBodyContentTypes defines a list of body Content-Types that are safe to be logged
-	// with LogRequestBody or LogResponseBody options.
+	// with LogRequestCURL, LogRequestBody or LogResponseBody options.
 	//
 	// If not provided, the default is ["application/json", "application/xml", "text/plain", "text/csv"].
 	LogBodyContentTypes []string
@@ -59,6 +62,15 @@ type Options struct {
 	//
 	// If not provided, the default is 1024 bytes. Set to -1 to log the full body.
 	LogBodyMaxLen int
+
+	// LogRequestAsCURL is an optional predicate function that controls logging of requests
+	// as curl commands. Useful for localhost debugging.
+	//
+	// If the predicate returns true, the request will be logged in "curl" attribute
+	// including all headers and body. If false, no curl logging will occur.
+	//
+	// WARNING: This will likely leak sensitive information in the logs. Do not use in production.
+	LogRequestAsCURL func(req *http.Request) bool
 }
 
 var defaultOptions = Options{
