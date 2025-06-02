@@ -2,7 +2,6 @@ package httplog
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -18,7 +17,9 @@ import (
 )
 
 func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Handler {
-	o = cmp.Or(o, &defaultOptions)
+	if o == nil {
+		o = &defaultOptions
+	}
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
