@@ -94,7 +94,7 @@ func main() {
 	})
 
 	r.Get("/info", func(w http.ResponseWriter, r *http.Request) {
-		httplog.InfoContext(r.Context(), "info here")
+		logger.InfoContext(r.Context(), "info here")
 
 		w.Header().Add("Content-Type", "text/plain")
 		w.Write([]byte("info here \n"))
@@ -103,7 +103,7 @@ func main() {
 	r.Get("/warn", func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		httplog.WarnContext(ctx, "warn here")
+		logger.WarnContext(ctx, "warn here")
 
 		w.WriteHeader(400)
 		w.Write([]byte("warn here \n"))
@@ -114,7 +114,7 @@ func main() {
 
 		// Log error explicitly.
 		err := errors.New("err here")
-		httplog.ErrorContext(ctx, "msg here", slog.Any("error", err))
+		logger.ErrorContext(ctx, "msg here", slog.Any("error", err))
 
 		// Logging with the global logger also works.
 		slog.Default().With(slog.Group("ImpGroup", slog.String("account", "id"))).ErrorContext(ctx, "doesn't exist")
@@ -126,11 +126,12 @@ func main() {
 
 	r.Post("/body", func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		_ = ctx
 
 		// Log request/response bodies for Admin requests.
 		if r.Header.Get("Authorization") == "Bearer ADMIN-SECRET" {
-			httplog.LogRequestBody(ctx)
-			httplog.LogResponseBody(ctx)
+			// logger.LogRequestBody(ctx)
+			// logger.LogResponseBody(ctx)
 		}
 
 		w.Write([]byte(`{"response": "payload"}`))
