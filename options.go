@@ -2,6 +2,7 @@ package httplog
 
 import (
 	"log/slog"
+	"net/http"
 )
 
 type Options struct {
@@ -31,12 +32,12 @@ type Options struct {
 	// LogRequestBody enables logging of request body. Useful for debugging.
 	//
 	// Use httplog.LogRequestBody(ctx) to enable on per-request basis instead.
-	LogRequestBody bool
+	LogRequestBody func(req *http.Request) bool
 
 	// LogRequestCURL enables logging of request body incl. all headers as a CURL command.
 	//
 	// Use httplog.LogRequestCURL(ctx) to enable on per-request basis instead.
-	LogRequestCURL bool
+	LogRequestCURL func(req *http.Request) bool
 
 	// LogResponseHeaders is an explicit list of headers to be logged as attributes.
 	//
@@ -46,7 +47,7 @@ type Options struct {
 	// LogResponseBody enables logging of response body. Useful for debugging.
 	//
 	// Use httplog.LogResponseBody(ctx) to enable on per-request basis instead.
-	LogResponseBody bool
+	LogResponseBody func(req *http.Request) bool
 
 	// LogBodyContentTypes defines a list of body Content-Types that are safe to be logged
 	// with LogRequestBody or LogResponseBody options.

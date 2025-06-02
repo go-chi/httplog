@@ -67,9 +67,10 @@ func main() {
 		LogRequestHeaders:  []string{"User-Agent", "Origin", "Referer"},
 		LogResponseHeaders: []string{},
 
-		// You can log request/request body. Useful for debugging.
-		LogRequestBody:  prettyLogs,
-		LogResponseBody: prettyLogs,
+		// You can log request/request body conditionally. Useful for debugging.
+		LogRequestCURL:  hasDebugHeader,
+		LogRequestBody:  hasDebugHeader,
+		LogResponseBody: hasDebugHeader,
 
 		LogBodyContentTypes: []string{"application/json"},
 	}))
@@ -125,9 +126,6 @@ func main() {
 	})
 
 	r.Post("/body", func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		_ = ctx
-
 		var payload struct {
 			Data string `json:"data"`
 		}
@@ -135,12 +133,6 @@ func main() {
 			w.WriteHeader(400)
 			w.Write([]byte(fmt.Sprintf(`{"error": "%v"}`, err)))
 			return
-		}
-
-		// Log request/response bodies for Admin requests.
-		if r.Header.Get("Authorization") == "Bearer ADMIN-SECRET" {
-			// logger.LogRequestBody(ctx)
-			// logger.LogResponseBody(ctx)
 		}
 
 		payload.Data = strings.ToUpper(payload.Data)
@@ -161,7 +153,7 @@ func main() {
 	fmt.Println("  curl -v http://localhost:8000/warn")
 	fmt.Println("  curl -v http://localhost:8000/err")
 	fmt.Println(`  curl -v http://localhost:8000/body -X POST --json '{"data": "some data"}'`)
-	fmt.Println(`  curl -v http://localhost:8000/body -X POST --json '{"data": "some data"}' -H "Authorization: Bearer ADMIN-SECRET"`)
+	fmt.Println(`  curl -v http://localhost:8000/body -X POST --json '{"data": "some data"}' -H "Debug: body"`)
 	fmt.Println()
 
 	if err := http.ListenAndServe("localhost:8000", r); err != http.ErrAbortHandler {
@@ -181,4 +173,8 @@ func getLogHandler(pretty bool) slog.Handler {
 
 	// JSON logs for production.
 	return slog.NewJSONHandler(os.Stdout, nil)
+}
+
+func hasDebugHeader(r *http.Request) bool {
+	return r.Header.Get("Debug") == "body"
 }
