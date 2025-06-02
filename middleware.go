@@ -24,12 +24,12 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := context.WithValue(r.Context(), ctxKeyLogAttrs{}, &[]slog.Attr{})
 
-			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
-
 			var reqBody bytes.Buffer
 			if o.LogRequestBody {
 				r.Body = io.NopCloser(io.TeeReader(r.Body, &reqBody))
 			}
+
+			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
 			var resBody bytes.Buffer
 			if o.LogResponseBody {
@@ -42,14 +42,6 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				logAttrs := make([]slog.Attr, 0)
 
 				if rec := recover(); rec != nil {
-					var p []uintptr
-					if rec != http.ErrAbortHandler {
-						pc := make([]uintptr, 10)   // Capture up to 10 stack frames.
-						n := runtime.Callers(3, pc) // Skip 3 frames (this middleware + runtime/panic.go).
-
-						p = pc[:n]
-					}
-
 					// Return HTTP 500 if recover is enabled and no response status was set.
 					if o.RecoverPanics && ww.Status() == 0 && r.Header.Get("Connection") != "Upgrade" {
 						ww.WriteHeader(http.StatusInternalServerError)
@@ -60,19 +52,23 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 						defer panic(rec)
 					}
 
-					// Process panic stack frames to print detailed information.
-					frames := runtime.CallersFrames(p)
-					var stackValues []string
-					for frame, more := frames.Next(); more; frame, more = frames.Next() {
-						if !strings.Contains(frame.File, "runtime/panic.go") {
-							stackValues = append(stackValues, fmt.Sprintf("%s:%d", frame.File, frame.Line))
-						}
-					}
+					logAttrs = append(logAttrs, slog.Any("panic", rec))
 
-					logAttrs = append(logAttrs,
-						slog.Any("panic", rec),
-						slog.Any("panicStack", stackValues),
-					)
+					if rec != http.ErrAbortHandler {
+						pc := make([]uintptr, 10)   // Capture up to 10 stack frames.
+						n := runtime.Callers(3, pc) // Skip 3 frames (this middleware + runtime/panic.go).
+						pc = pc[:n]
+
+						// Process panic stack frames to print detailed information.
+						frames := runtime.CallersFrames(pc)
+						var stackValues []string
+						for frame, more := frames.Next(); more; frame, more = frames.Next() {
+							if !strings.Contains(frame.File, "runtime/panic.go") {
+								stackValues = append(stackValues, fmt.Sprintf("%s:%d", frame.File, frame.Line))
+							}
+						}
+						logAttrs = append(logAttrs, slog.Any("panicStack", stackValues))
+					}
 				}
 
 				duration := time.Since(start)
@@ -80,14 +76,14 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 
 				var lvl slog.Level
 				switch {
-				case r.Method == "OPTIONS":
-					lvl = slog.LevelDebug
 				case statusCode >= 500:
 					lvl = slog.LevelError
 				case statusCode == 429:
 					lvl = slog.LevelInfo
 				case statusCode >= 400:
 					lvl = slog.LevelWarn
+				case r.Method == "OPTIONS":
+					lvl = slog.LevelDebug
 				default:
 					lvl = slog.LevelInfo
 				}
@@ -98,8 +94,11 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				}
 
 				if o.LogRequestBody {
-					// Make sure to read full request body if the underlying handler didn't do so.
-					_, _ = io.Copy(io.Discard, r.Body)
+					// Ensure the request body is fully read if the underlying HTTP handler didn't do so.
+					n, _ := io.Copy(io.Discard, r.Body)
+					if n > 0 {
+						logAttrs = append(logAttrs, slog.Any("request.bytes.unread", n))
+					}
 				}
 
 				// Request attributes
@@ -130,7 +129,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				}
 				if !o.Concise {
 					resAttrs = append(resAttrs,
-						slog.Int("status", ww.Status()),
+						slog.Int("status", statusCode),
 						slog.Float64("duration", float64(duration.Milliseconds())),
 						slog.Int("bytes", ww.BytesWritten()),
 					)
@@ -144,13 +143,13 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					}
 				}
 
-				if !o.Concise || ww.Status() >= 400 || o.Level < slog.LevelInfo {
+				if !o.Concise || statusCode >= 400 || o.Level < slog.LevelInfo {
 					logAttrs = append(logAttrs, slog.Any("request", slog.GroupValue(reqAttrs...)))
 					logAttrs = append(logAttrs, slog.Any("response", slog.GroupValue(resAttrs...)))
 					logAttrs = append(logAttrs, getAttrs(ctx)...)
 				}
 
-				msg := fmt.Sprintf("%s %s => HTTP %v (%v)", r.Method, r.URL, ww.Status(), duration)
+				msg := fmt.Sprintf("%s %s => HTTP %v (%v)", r.Method, r.URL, statusCode, duration)
 				logger.LogAttrs(ctx, lvl, msg, logAttrs...)
 			}()
 
