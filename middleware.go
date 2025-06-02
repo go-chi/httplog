@@ -27,19 +27,14 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
+			var reqBody bytes.Buffer
+			if o.LogRequestBody {
+				r.Body = io.NopCloser(io.TeeReader(r.Body, &reqBody))
+			}
+
 			var resBody bytes.Buffer
 			if o.LogResponseBody {
 				ww.Tee(&resBody)
-			}
-
-			var reqBody bytes.Buffer
-			if o.LogRequestBody {
-				bodyBytes, err := io.ReadAll(r.Body)
-				if err == nil {
-					reqBody.Write(bodyBytes) // buffer for logging
-				}
-
-				r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // restore body
 			}
 
 			start := time.Now()
@@ -62,7 +57,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					}
 
 					if rec == http.ErrAbortHandler || !o.RecoverPanics {
-						// Always re-panic http.ErrAbortHandler. Re-panic everything unless recover is enabled.
+						// Re-panic http.ErrAbortHandler unconditionally, and re-panic other errors if panic recovery is disabled.
 						defer panic(rec)
 					}
 
@@ -98,7 +93,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					lvl = slog.LevelInfo
 				}
 
-				// Stop processign, when the message wouldn't be logged, or when the the level os lover, the level in options
+				// Skip logging if the message level is below the logger's level or the minimum level specified in options
 				if !logger.Enabled(ctx, lvl) || lvl < o.Level {
 					return
 				}
