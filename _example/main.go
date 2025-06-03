@@ -20,11 +20,9 @@ import (
 func main() {
 	isLocalhost := os.Getenv("ENV") == "localhost"
 
-	logHandler := getLogHandler(isLocalhost)
-	logHandler = traceid.LogHandler(logHandler) // Add "traceId" to all logs, if available in ctx.
+	logHandler := logHandler(isLocalhost)
 
 	logger := slog.New(logHandler)
-
 	if !isLocalhost {
 		logger = logger.With(
 			slog.String("app", "example-app"),
@@ -53,9 +51,7 @@ func main() {
 		// slog.LevelError - log 5xx responses only
 		Level: slog.LevelInfo,
 
-		// Concise mode causes fewer log attributes to be printed in request logs.
-		// This is useful if your console is too noisy during development.
-		Concise: isLocalhost,
+		Format: logFormat(isLocalhost),
 
 		// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 		// and middlewares. It returns HTTP 500 unless response status was already set.
@@ -64,7 +60,7 @@ func main() {
 		RecoverPanics: true,
 
 		// Select request/response headers to be logged explicitly.
-		LogRequestHeaders:  []string{"User-Agent", "Origin", "Referer"},
+		LogRequestHeaders:  []string{"Origin"},
 		LogResponseHeaders: []string{},
 
 		// You can log request/request body conditionally. Useful for debugging.
@@ -112,7 +108,7 @@ func main() {
 
 		logger.WarnContext(ctx, "warn here")
 
-		w.WriteHeader(400)
+		w.WriteHeader(200)
 		w.Write([]byte("warn here \n"))
 	})
 
@@ -128,16 +124,18 @@ func main() {
 		slog.Default().ErrorContext(ctx, "oops, error occurred")
 
 		w.WriteHeader(500)
-		w.Write([]byte("oops, err \n"))
+		w.Write([]byte(fmt.Sprintf(`{"error": "%v"}`, err)))
 	})
 
 	r.Post("/upper", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "xapplication/json")
+
 		var payload struct {
 			Data string `json:"data"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			w.WriteHeader(400)
-			w.Write([]byte(fmt.Sprintf(`{"error": "%v"}`, err)))
+			w.Write([]byte(fmt.Sprintf(`{"error": %q}`, fmt.Errorf("invalid json: %w", err))))
 			return
 		}
 		if payload.Data == "" {
@@ -173,8 +171,15 @@ func main() {
 	}
 }
 
-func getLogHandler(pretty bool) slog.Handler {
-	if pretty {
+func logFormat(isLocalhost bool) httplog.Format {
+	if isLocalhost {
+		return httplog.Concise
+	}
+	return httplog.ECS
+}
+
+func logHandler(isLocalhost bool) slog.Handler {
+	if isLocalhost {
 		// Pretty logs for localhost development.
 		return devslog.NewHandler(os.Stdout, &devslog.Options{
 			SortKeys:           true,
@@ -183,8 +188,10 @@ func getLogHandler(pretty bool) slog.Handler {
 		})
 	}
 
-	// JSON logs for production.
-	return slog.NewJSONHandler(os.Stdout, nil)
+	// JSON logs for production with "traceId".
+	return traceid.LogHandler(
+		slog.NewJSONHandler(os.Stdout, nil),
+	)
 }
 
 func isDebugHeaderSet(r *http.Request) bool {

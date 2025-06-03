@@ -70,9 +70,8 @@ func main() {
 		// slog.LevelError - log 5xx responses only
 		Level: slog.LevelInfo,
 
-		// Concise mode causes fewer log attributes to be printed in request logs.
-		// This is useful if your console is too noisy during development.
-		Concise: false,
+		// Log in Elastic Common Schema (ECS) format.
+		Format: httplog.ECS,
 
 		// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 		// and middlewares. It returns HTTP 500 unless response status was already set.
@@ -105,6 +104,13 @@ func main() {
 	})
 
 	http.ListenAndServe("localhost:8000", r)
+}
+
+func logFormat(isLocalhost bool) httplog.Format {
+	if isLocalhost {
+		return httplog.Concise
+	}
+	return httplog.ECS
 }
 
 func isDebugHeaderSet(r *http.Request) bool {

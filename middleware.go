@@ -24,6 +24,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 	if o.LogBodyMaxLen == 0 {
 		o.LogBodyMaxLen = defaultOptions.LogBodyMaxLen
 	}
+	f := o.Format
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -47,7 +48,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 			start := time.Now()
 
 			defer func() {
-				logAttrs := make([]slog.Attr, 0)
+				var logAttrs []slog.Attr
 
 				if rec := recover(); rec != nil {
 					// Return HTTP 500 if recover is enabled and no response status was set.
@@ -60,7 +61,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 						defer panic(rec)
 					}
 
-					logAttrs = append(logAttrs, slog.Any("panic", rec))
+					logAttrs = appendAttrs(logAttrs, slog.String(f.Error, fmt.Sprintf("panic: %v", rec)))
 
 					if rec != http.ErrAbortHandler {
 						pc := make([]uintptr, 10)   // Capture up to 10 stack frames.
@@ -75,7 +76,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 								stackValues = append(stackValues, fmt.Sprintf("%s:%d", frame.File, frame.Line))
 							}
 						}
-						logAttrs = append(logAttrs, slog.Any("panicStack", stackValues))
+						logAttrs = appendAttrs(logAttrs, slog.Any(f.ErrorStackTrace, stackValues))
 					}
 				}
 
@@ -101,51 +102,49 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					return
 				}
 
-				// Request attributes
-				reqAttrs := []slog.Attr{
-					slog.Any("headers", slog.GroupValue(getHeaderAttrs(r.Header, o.LogRequestHeaders)...)),
-				}
-				if !o.Concise {
-					reqAttrs = append(reqAttrs,
-						slog.String("url", requestURL(r)),
-						slog.String("method", r.Method),
-						slog.String("path", r.URL.Path),
-						slog.String("remoteIp", r.RemoteAddr),
-						slog.String("proto", r.Proto),
-					)
-				}
+				logAttrs = appendAttrs(logAttrs,
+					slog.String(f.Timestamp, start.Format(time.RFC3339)),
+					slog.String(f.Level, lvl.String()),
+					slog.String(f.Message, fmt.Sprintf("%s %s => HTTP %v (%v)", r.Method, r.URL, statusCode, duration)),
+					slog.String(f.RequestURL, requestURL(r)),
+					slog.String(f.RequestMethod, r.Method),
+					slog.String(f.RequestPath, r.URL.Path),
+					slog.String(f.RequestRemoteIP, r.RemoteAddr),
+					slog.String(f.RequestHost, r.Host),
+					slog.String(f.RequestScheme, scheme(r)),
+					slog.String(f.RequestProto, r.Proto),
+					slog.Any(f.RequestHeaders, slog.GroupValue(getHeaderAttrs(r.Header, o.LogRequestHeaders)...)),
+					slog.Int64(f.RequestBytes, r.ContentLength),
+					slog.String(f.RequestUserAgent, r.UserAgent()),
+					slog.String(f.RequestReferer, r.Referer()),
+					slog.Any(f.ResponseHeaders, slog.GroupValue(getHeaderAttrs(ww.Header(), o.LogResponseHeaders)...)),
+					slog.Int(f.ResponseStatus, statusCode),
+					slog.Float64(f.ResponseDuration, float64(duration.Milliseconds())),
+					slog.Int(f.ResponseBytes, ww.BytesWritten()),
+				)
+
 				if logReqBody || o.LogExtraAttrs != nil {
 					// Ensure the request body is fully read if the underlying HTTP handler didn't do so.
 					n, _ := io.Copy(io.Discard, r.Body)
 					if n > 0 {
-						reqAttrs = append(reqAttrs, slog.Any("request.bytes.unread", n))
+						logAttrs = appendAttrs(logAttrs, slog.Any(f.RequestBytesUnread, n))
 					}
 				}
 				if logReqBody {
-					reqAttrs = append(reqAttrs, slog.String("body", logBody(&reqBody, r.Header, o)))
-				}
-
-				// Response attributes
-				respAttrs := []slog.Attr{
-					slog.Any("headers", slog.GroupValue(getHeaderAttrs(ww.Header(), o.LogResponseHeaders)...)),
-				}
-				if !o.Concise {
-					respAttrs = append(respAttrs,
-						slog.Int("status", statusCode),
-						slog.Float64("duration", float64(duration.Milliseconds())),
-						slog.Int("bytes", ww.BytesWritten()),
-					)
+					logAttrs = appendAttrs(logAttrs, slog.String(f.RequestBody, logBody(&reqBody, r.Header, o)))
 				}
 				if logRespBody {
-					respAttrs = append(respAttrs, slog.String("body", logBody(&respBody, ww.Header(), o)))
+					logAttrs = appendAttrs(logAttrs, slog.String(f.ResponseBody, logBody(&respBody, ww.Header(), o)))
 				}
-
-				logAttrs = append(logAttrs, slog.Any("request", slog.GroupValue(reqAttrs...)))
-				logAttrs = append(logAttrs, slog.Any("response", slog.GroupValue(respAttrs...)))
 				if o.LogExtraAttrs != nil {
-					logAttrs = append(logAttrs, o.LogExtraAttrs(r, reqBody.String(), statusCode)...)
+					logAttrs = appendAttrs(logAttrs, o.LogExtraAttrs(r, reqBody.String(), statusCode)...)
 				}
-				logAttrs = append(logAttrs, getAttrs(ctx)...)
+				logAttrs = appendAttrs(logAttrs, getAttrs(ctx)...)
+
+				// Group attributes into nested objects, e.g. for GCP structured logs.
+				if f.GroupDelimiter != "" {
+					logAttrs = groupAttrs(logAttrs, f.GroupDelimiter)
+				}
 
 				msg := fmt.Sprintf("%s %s => HTTP %v (%v)", r.Method, r.URL, statusCode, duration)
 				logger.LogAttrs(ctx, lvl, msg, logAttrs...)
@@ -154,6 +153,35 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 			next.ServeHTTP(ww, r.WithContext(ctx))
 		})
 	}
+}
+
+func appendAttrs(attrs []slog.Attr, newAttrs ...slog.Attr) []slog.Attr {
+	for _, attr := range newAttrs {
+		if attr.Key != "" {
+			attrs = append(attrs, attr)
+		}
+	}
+	return attrs
+}
+
+func groupAttrs(attrs []slog.Attr, delimiter string) []slog.Attr {
+	var result []slog.Attr
+	var nested = map[string][]slog.Attr{}
+
+	for _, attr := range attrs {
+		prefix, key, found := strings.Cut(attr.Key, delimiter)
+		if !found {
+			result = append(result, attr)
+			continue
+		}
+		nested[prefix] = append(nested[prefix], slog.Attr{Key: key, Value: attr.Value})
+	}
+
+	for prefix, attrs := range nested {
+		result = append(result, slog.Any(prefix, slog.GroupValue(attrs...)))
+	}
+
+	return result
 }
 
 func getHeaderAttrs(header http.Header, headers []string) []slog.Attr {
@@ -173,13 +201,14 @@ func logBody(body *bytes.Buffer, header http.Header, o *Options) string {
 	if body.Len() == 0 {
 		return ""
 	}
-	for _, contentType := range o.LogBodyContentTypes {
-		if strings.HasPrefix(header.Get("Content-Type"), contentType) {
+	contentType := header.Get("Content-Type")
+	for _, whitelisted := range o.LogBodyContentTypes {
+		if strings.HasPrefix(contentType, whitelisted) {
 			if o.LogBodyMaxLen <= 0 || o.LogBodyMaxLen >= body.Len() {
 				return body.String()
 			}
 			return body.String()[:o.LogBodyMaxLen] + "... [trimmed]"
 		}
 	}
-	return "[redacted]"
+	return fmt.Sprintf("[body redacted for Content-Type: %s]", contentType)
 }

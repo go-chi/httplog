@@ -15,6 +15,10 @@ type Options struct {
 	// Use httplog.SetLevel(ctx, slog.DebugLevel) to override the level per-request.
 	Level slog.Level
 
+	// Format defines the format of the request log attributes.
+	// If not provided, the default is Elastic Common Schema (ECS).
+	Format Format
+
 	// Concise mode causes fewer log attributes to be printed in request logs.
 	// This is useful if your console is too noisy during development.
 	Concise bool
@@ -26,7 +30,7 @@ type Options struct {
 	RecoverPanics bool
 
 	// LogRequestHeaders is a list of headers to be logged as attributes.
-	// If not provided, the default is ["Content-Type", "User-Agent", "Referer", "Origin"].
+	// If not provided, the default is ["Content-Type", "Origin"].
 	//
 	// WARNING: Do not leak any request headers with sensitive information.
 	LogRequestHeaders []string
@@ -55,7 +59,7 @@ type Options struct {
 	// LogBodyContentTypes defines a list of body Content-Types that are safe to be logged
 	// with LogRequestCURL, LogRequestBody or LogResponseBody options.
 	//
-	// If not provided, the default is ["application/json", "application/xml", "text/plain", "text/csv"].
+	// If not provided, the default is ["application/json", "application/xml", "text/plain", "text/csv", "application/x-www-form-urlencoded", ""].
 	LogBodyContentTypes []string
 
 	// LogBodyMaxLen defines the maximum length of the body to be logged.
@@ -84,8 +88,8 @@ type Options struct {
 var defaultOptions = Options{
 	Level:               slog.LevelInfo,
 	RecoverPanics:       true,
-	LogRequestHeaders:   []string{"Content-Type", "User-Agent", "Referer", "Origin"},
+	LogRequestHeaders:   []string{"Content-Type", "Origin"},
 	LogResponseHeaders:  []string{"Content-Type"},
-	LogBodyContentTypes: []string{"application/json", "application/xml", "text/plain", "text/csv"},
+	LogBodyContentTypes: []string{"application/json", "application/xml", "text/plain", "text/csv", "application/x-www-form-urlencoded", ""},
 	LogBodyMaxLen:       1024,
 }

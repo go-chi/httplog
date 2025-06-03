@@ -34,11 +34,13 @@ func singleQuoted(v string) string {
 	return fmt.Sprintf("'%s'", strings.ReplaceAll(v, "'", `'\''`))
 }
 
-func requestURL(r *http.Request) string {
-	scheme := "http"
+func scheme(r *http.Request) string {
 	if r.TLS != nil {
-		scheme = "https"
+		return "https"
 	}
+	return "http"
+}
 
-	return fmt.Sprintf("%s://%s%s", scheme, r.Host, r.URL)
+func requestURL(r *http.Request) string {
+	return fmt.Sprintf("%s://%s%s", scheme(r), r.Host, r.URL)
 }
