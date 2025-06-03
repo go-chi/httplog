@@ -6,21 +6,22 @@ import (
 	"strings"
 )
 
-func curl(r *http.Request, reqBody string) string {
+// CURL returns a curl command for the given request and body.
+func CURL(req *http.Request, reqBody string) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "curl")
-	if r.Method != "GET" && r.Method != "POST" {
-		fmt.Fprintf(&b, " -X %s", r.Method)
+	if req.Method != "GET" && req.Method != "POST" {
+		fmt.Fprintf(&b, " -X %s", req.Method)
 	}
 
-	fmt.Fprintf(&b, " %s", singleQuoted(requestURL(r)))
+	fmt.Fprintf(&b, " %s", singleQuoted(requestURL(req)))
 
-	if r.Method == "POST" {
+	if req.Method == "POST" {
 		fmt.Fprintf(&b, " --data-raw %s", singleQuoted(reqBody))
 	}
 
-	for name, vals := range r.Header {
+	for name, vals := range req.Header {
 		for _, val := range vals {
 			fmt.Fprintf(&b, " -H %s", singleQuoted(fmt.Sprintf("%s: %s", name, val)))
 		}

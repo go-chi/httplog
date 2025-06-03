@@ -63,14 +63,22 @@ type Options struct {
 	// If not provided, the default is 1024 bytes. Set to -1 to log the full body.
 	LogBodyMaxLen int
 
-	// LogRequestAsCURL is an optional predicate function that controls logging of requests
-	// as curl commands. Useful for localhost debugging.
+	// LogExtraAttrs is an optional function that lets you add extra attributes to the
+	// request log.
 	//
-	// If the predicate returns true, the request will be logged in "curl" attribute
-	// including all headers and body. If false, no curl logging will occur.
+	// Example:
 	//
-	// WARNING: This will likely leak sensitive information in the logs. Do not use in production.
-	LogRequestAsCURL func(req *http.Request) bool
+	// // Log all requests with invalid payload as curl command.
+	// func(req *http.Request, reqBody string, respStatus int) []slog.Attr {
+	//     if respStatus == 400 || respStatus == 422 {
+	// 	       req.Header.Del("Authorization")
+	//         return []slog.Attr{slog.String("curl", httplog.CURL(req, reqBody))}
+	// 	   }
+	// 	   return nil
+	// }
+	//
+	// WARNING: Be careful not to leak any sensitive information in the logs.
+	LogExtraAttrs func(req *http.Request, reqBody string, respStatus int) []slog.Attr
 }
 
 var defaultOptions = Options{

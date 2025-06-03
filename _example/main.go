@@ -70,6 +70,15 @@ func main() {
 		// You can log request/request body conditionally. Useful for debugging.
 		LogRequestBody:  isDebugHeaderSet,
 		LogResponseBody: isDebugHeaderSet,
+
+		// Log all requests with invalid payload as curl command.
+		LogExtraAttrs: func(req *http.Request, reqBody string, respStatus int) []slog.Attr {
+			if respStatus == 400 || respStatus == 422 {
+				req.Header.Del("Authorization")
+				return []slog.Attr{slog.String("curl", httplog.CURL(req, reqBody))}
+			}
+			return nil
+		},
 	}))
 
 	r.Use(func(next http.Handler) http.Handler {
@@ -122,13 +131,18 @@ func main() {
 		w.Write([]byte("oops, err \n"))
 	})
 
-	r.Post("/body", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/upper", func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
 			Data string `json:"data"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			w.WriteHeader(400)
 			w.Write([]byte(fmt.Sprintf(`{"error": "%v"}`, err)))
+			return
+		}
+		if payload.Data == "" {
+			w.WriteHeader(422)
+			w.Write([]byte(`{"error": "data field is required"}`))
 			return
 		}
 
@@ -149,8 +163,9 @@ func main() {
 	fmt.Println("  curl -v http://localhost:8000/info")
 	fmt.Println("  curl -v http://localhost:8000/warn")
 	fmt.Println("  curl -v http://localhost:8000/err")
-	fmt.Println(`  curl -v http://localhost:8000/body -X POST --json '{"data": "some data"}'`)
-	fmt.Println(`  curl -v http://localhost:8000/body -X POST --json '{"data": "some data"}' -H "Debug: reveal-logs"`)
+	fmt.Println(`  curl -v http://localhost:8000/upper -X POST --json '{"data": "valid payload"}'`)
+	fmt.Println(`  curl -v http://localhost:8000/upper -X POST --json '{"data": "valid payload"}' -H "Debug: reveal-logs"`)
+	fmt.Println(`  curl -v http://localhost:8000/upper -X POST --json '{"xx": "invalid payload"}'`)
 	fmt.Println()
 
 	if err := http.ListenAndServe("localhost:8000", r); err != http.ErrAbortHandler {

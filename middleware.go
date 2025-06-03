@@ -31,10 +31,9 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 
 			logReqBody := o.LogRequestBody != nil && o.LogRequestBody(r)
 			logRespBody := o.LogResponseBody != nil && o.LogResponseBody(r)
-			logReqCURL := o.LogRequestAsCURL != nil && o.LogRequestAsCURL(r)
 
 			var reqBody bytes.Buffer
-			if logReqBody || logReqCURL {
+			if logReqBody || o.LogExtraAttrs != nil {
 				r.Body = io.NopCloser(io.TeeReader(r.Body, &reqBody))
 			}
 
@@ -106,19 +105,6 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				reqAttrs := []slog.Attr{
 					slog.Any("headers", slog.GroupValue(getHeaderAttrs(r.Header, o.LogRequestHeaders)...)),
 				}
-				if logReqBody {
-					// Ensure the request body is fully read if the underlying HTTP handler didn't do so.
-					n, _ := io.Copy(io.Discard, r.Body)
-					if n > 0 {
-						reqAttrs = append(reqAttrs, slog.Any("request.bytes.unread", n))
-					}
-				}
-				if logReqBody {
-					reqAttrs = append(reqAttrs, slog.String("body", logBody(&reqBody, r.Header, o)))
-				}
-				if logReqCURL {
-					reqAttrs = append(reqAttrs, slog.String("curl", curl(r, reqBody.String())))
-				}
 				if !o.Concise {
 					reqAttrs = append(reqAttrs,
 						slog.String("url", requestURL(r)),
@@ -128,15 +114,21 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 						slog.String("proto", r.Proto),
 					)
 				}
+				if logReqBody || o.LogExtraAttrs != nil {
+					// Ensure the request body is fully read if the underlying HTTP handler didn't do so.
+					n, _ := io.Copy(io.Discard, r.Body)
+					if n > 0 {
+						reqAttrs = append(reqAttrs, slog.Any("request.bytes.unread", n))
+					}
+				}
+				if logReqBody {
+					reqAttrs = append(reqAttrs, slog.String("body", logBody(&reqBody, r.Header, o)))
+				}
 
 				// Response attributes
 				respAttrs := []slog.Attr{
 					slog.Any("headers", slog.GroupValue(getHeaderAttrs(ww.Header(), o.LogResponseHeaders)...)),
 				}
-				if logRespBody {
-					respAttrs = append(respAttrs, slog.String("body", logBody(&respBody, ww.Header(), o)))
-				}
-
 				if !o.Concise {
 					respAttrs = append(respAttrs,
 						slog.Int("status", statusCode),
@@ -144,9 +136,15 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 						slog.Int("bytes", ww.BytesWritten()),
 					)
 				}
+				if logRespBody {
+					respAttrs = append(respAttrs, slog.String("body", logBody(&respBody, ww.Header(), o)))
+				}
 
 				logAttrs = append(logAttrs, slog.Any("request", slog.GroupValue(reqAttrs...)))
 				logAttrs = append(logAttrs, slog.Any("response", slog.GroupValue(respAttrs...)))
+				if o.LogExtraAttrs != nil {
+					logAttrs = append(logAttrs, o.LogExtraAttrs(r, reqBody.String(), statusCode)...)
+				}
 				logAttrs = append(logAttrs, getAttrs(ctx)...)
 
 				msg := fmt.Sprintf("%s %s => HTTP %v (%v)", r.Method, r.URL, statusCode, duration)
