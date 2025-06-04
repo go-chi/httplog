@@ -1,0 +1,158 @@
+package httplog
+
+// Schema defines the mapping of semantic log fields to their corresponding
+// field names in different logging systems and standards.
+//
+// This enables log output in different formats compatible with various logging
+// platforms and standards (ECS, OTEL, GCP, etc.) by providing the schema.
+type Schema struct {
+	// Base attributes for core logging information.
+	Timestamp       string // Timestamp of the log entry
+	Level           string // Log level (info, warn, error, etc.)
+	Message         string // Primary log message
+	Error           string // Error message when an error occurs
+	ErrorStackTrace string // Stack trace for errors
+
+	// Request attributes for the incoming HTTP request.
+	// NOTE: RequestQuery is intentionally not supported as it would likely leak sensitive data.
+	RequestURL         string // Full request URL
+	RequestMethod      string // HTTP method (GET, POST, etc.)
+	RequestPath        string // URL path component
+	RequestRemoteIP    string // Client IP address
+	RequestHost        string // Host header value
+	RequestScheme      string // URL scheme (http, https)
+	RequestProto       string // HTTP protocol version (HTTP/1.1, HTTP/2, etc.)
+	RequestHeaders     string // Selected request headers
+	RequestBody        string // Request body content, if logged.
+	RequestBytes       string // Size of request body in bytes
+	RequestBytesUnread string // Unread bytes in request body
+	RequestUserAgent   string // User-Agent header value
+	RequestReferer     string // Referer header value
+
+	// Response attributes for the HTTP response.
+	ResponseHeaders  string // Selected response headers
+	ResponseBody     string // Response body content, if logged.
+	ResponseStatus   string // HTTP status code
+	ResponseDuration string // Request processing duration
+	ResponseBytes    string // Size of response body in bytes
+
+	// GroupDelimiter is an optional delimiter for nested objects in some formats.
+	// For example, GCP uses nested JSON objects like "httpRequest": {}.
+	GroupDelimiter string
+}
+
+var (
+	// SchemaECS represents the Elastic Common Schema (SchemaECS) version 9.0.0.
+	// This schema is widely used with Elasticsearch and the Elastic Stack.
+	//
+	// Reference: https://www.elastic.co/guide/en/ecs/current/ecs-http.html
+	SchemaECS = Schema{
+		Timestamp:          "@timestamp",
+		Level:              "log.level",
+		Message:            "message",
+		Error:              "error.message",
+		ErrorStackTrace:    "error.stack_trace",
+		RequestURL:         "url.full",
+		RequestMethod:      "http.request.method",
+		RequestPath:        "url.path",
+		RequestRemoteIP:    "client.ip",
+		RequestHost:        "url.domain",
+		RequestScheme:      "url.scheme",
+		RequestProto:       "http.version",
+		RequestHeaders:     "http.request.headers",
+		RequestBody:        "http.request.body.content",
+		RequestBytes:       "http.request.body.bytes",
+		RequestBytesUnread: "http.request.body.unread.bytes",
+		RequestUserAgent:   "user_agent.original",
+		RequestReferer:     "http.request.referrer",
+		ResponseHeaders:    "http.response.headers",
+		ResponseBody:       "http.response.body.content",
+		ResponseStatus:     "http.response.status_code",
+		ResponseDuration:   "event.duration",
+		ResponseBytes:      "http.response.body.bytes",
+	}
+
+	// SchemaOTEL represents OpenTelemetry (SchemaOTEL) semantic conventions version 1.34.0.
+	// This schema follows OpenTelemetry standards for observability data.
+	//
+	// Reference: https://opentelemetry.io/docs/specs/semconv/http/http-metrics
+	SchemaOTEL = Schema{
+		Timestamp:          "timestamp",
+		Level:              "severity_text",
+		Message:            "body",
+		Error:              "exception.message",
+		ErrorStackTrace:    "exception.stacktrace",
+		RequestURL:         "url.full",
+		RequestMethod:      "http.request.method",
+		RequestPath:        "url.path",
+		RequestRemoteIP:    "client.address",
+		RequestHost:        "server.address",
+		RequestScheme:      "url.scheme",
+		RequestProto:       "network.protocol.version",
+		RequestHeaders:     "http.request.header",
+		RequestBody:        "http.request.body.content",
+		RequestBytes:       "http.request.body.size",
+		RequestBytesUnread: "http.request.body.unread.size",
+		RequestUserAgent:   "user_agent.original",
+		RequestReferer:     "http.request.header.referer",
+		ResponseHeaders:    "http.response.header",
+		ResponseBody:       "http.response.body.content",
+		ResponseStatus:     "http.response.status_code",
+		ResponseDuration:   "http.server.request.duration",
+		ResponseBytes:      "http.response.body.size",
+	}
+
+	// SchemaGCP represents Google Cloud Platform's structured logging format.
+	// This schema is optimized for Google Cloud Logging service.
+	//
+	// References:
+	//   - https://cloud.google.com/logging/docs/structured-logging
+	//   - https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#HttpRequest
+	SchemaGCP = Schema{
+		Timestamp:          "timestamp",
+		Level:              "severity",
+		Message:            "message",
+		Error:              "error",
+		ErrorStackTrace:    "stack_trace",
+		RequestURL:         "httpRequest.requestUrl",
+		RequestMethod:      "httpRequest.requestMethod",
+		RequestPath:        "httpRequest.requestPath",
+		RequestRemoteIP:    "httpRequest.remoteIp",
+		RequestHost:        "httpRequest.host",
+		RequestScheme:      "httpRequest.scheme",
+		RequestProto:       "httpRequest.protocol",
+		RequestHeaders:     "httpRequest.requestHeaders",
+		RequestBody:        "httpRequest.requestBody",
+		RequestBytes:       "httpRequest.requestSize",
+		RequestBytesUnread: "httpRequest.requestUnreadSize",
+		RequestUserAgent:   "httpRequest.userAgent",
+		RequestReferer:     "httpRequest.referer",
+		ResponseHeaders:    "httpRequest.responseHeaders",
+		ResponseBody:       "httpRequest.responseBody",
+		ResponseStatus:     "httpRequest.status",
+		ResponseDuration:   "httpRequest.latency",
+		ResponseBytes:      "httpRequest.responseSize",
+		GroupDelimiter:     ".",
+	}
+)
+
+// Concise returns a simplified schema with essential fields only. When concise is true,
+// it reduces log output by keeping only error, request, and response details.
+//
+// This is useful for localhost development to reduce log verbosity.
+func (s Schema) Concise(concise bool) Schema {
+	if !concise {
+		return s
+	}
+
+	return Schema{
+		Error:              s.Error,
+		ErrorStackTrace:    s.ErrorStackTrace,
+		RequestHeaders:     s.RequestHeaders,
+		RequestBody:        s.RequestBody,
+		RequestBytesUnread: s.RequestBytesUnread,
+		ResponseHeaders:    s.ResponseHeaders,
+		ResponseBody:       s.ResponseBody,
+		GroupDelimiter:     s.GroupDelimiter,
+	}
+}
