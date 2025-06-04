@@ -34,6 +34,13 @@ type Options struct {
 	// NOTE: Panics are logged as errors automatically, regardless of this setting.
 	RecoverPanics bool
 
+	// Skip is an optional predicate function that determines whether to skip
+	// recording logs for a given request.
+	//
+	// If nil, all requests are recorded.
+	// If provided, requests where Skip returns true will not be recorded.
+	Skip func(req *http.Request, respStatus int) bool
+
 	// LogRequestHeaders is a list of headers to be logged as attributes.
 	// If not provided, the default is ["Content-Type", "Origin"].
 	//

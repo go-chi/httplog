@@ -86,6 +86,11 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				duration := time.Since(start)
 				statusCode := ww.Status()
 
+				// Skip logging if the request is filtered by the Skip function.
+				if o.Skip != nil && o.Skip(r, statusCode) {
+					return
+				}
+
 				var lvl slog.Level
 				switch {
 				case statusCode >= 500:

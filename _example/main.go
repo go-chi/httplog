@@ -58,6 +58,11 @@ func main() {
 		// NOTE: Panics are logged as errors automatically, regardless of this setting.
 		RecoverPanics: true,
 
+		// Filter out some request logs.
+		Skip: func(req *http.Request, respStatus int) bool {
+			return respStatus == 404 || respStatus == 405
+		},
+
 		// Select request/response headers to be logged explicitly.
 		LogRequestHeaders:  []string{"Origin"},
 		LogResponseHeaders: []string{},

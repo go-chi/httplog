@@ -67,11 +67,17 @@ func main() {
 		// NOTE: Panics are logged as errors automatically, regardless of this setting.
 		RecoverPanics: true,
 
-		// Select request/response headers to be logged explicitly.
+		// Optionally, filter out some request logs.
+		Skip: func(req *http.Request, respStatus int) bool {
+			return respStatus == 404 || respStatus == 405
+		},
+
+		// Optionally, log selected request/response headers explicitly.
 		LogRequestHeaders:  []string{"Origin"},
 		LogResponseHeaders: []string{},
 
-		// Enable logging of request/request body conditionally. Useful for debugging.
+		// Optionally, enable logging of request/response body based on custom conditions.
+		// Useful for debugging payload issues in development.
 		LogRequestBody:  isDebugHeaderSet,
 		LogResponseBody: isDebugHeaderSet,
 	}))
