@@ -51,7 +51,8 @@ func main() {
 		// slog.LevelError - log 5xx responses only
 		Level: slog.LevelInfo,
 
-		Schema: httplog.SchemaGCP.Concise(isLocalhost),
+		// Use Elastic Common Schema (SchemaECS) log output format.
+		Schema: httplog.SchemaECS.Concise(isLocalhost),
 
 		// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 		// and middlewares. It returns HTTP 500 unless response status was already set.
