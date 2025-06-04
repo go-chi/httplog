@@ -2,8 +2,8 @@
 
 > Structured HTTP request logging middleware for Go, built on the standard library `log/slog` package
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/golang-cz/httplog.svg)](https://pkg.go.dev/github.com/golang-cz/httplog)
-[![Go Report Card](https://goreportcard.com/badge/github.com/golang-cz/httplog)](https://goreportcard.com/report/github.com/golang-cz/httplog)
+[![Go Reference](https://pkg.go.dev/badge/github.com/go-chi/httplog/v3.svg)](https://pkg.go.dev/github.com/go-chi/httplog/v3)
+[![Go Report Card](https://goreportcard.com/badge/github.com/go-chi/httplog)](https://goreportcard.com/report/github.com/go-chi/httplog)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 `httplog` is a lightweight, high-performance HTTP request logging middleware for Go web applications. Built on Go 1.21+'s standard `log/slog` package, it provides structured logging with zero external dependencies.
@@ -22,7 +22,7 @@
 
 ## Usage
 
-`go get github.com/golang-cz/httplog@latest`
+`go get github.com/go-chi/httplog/v3@latest`
 
 ```go
 package main
@@ -37,7 +37,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/golang-cz/httplog"
+	"github.com/go-chi/httplog/v3"
 )
 
 func main() {

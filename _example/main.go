@@ -14,7 +14,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/traceid"
 	"github.com/golang-cz/devslog"
-	"github.com/golang-cz/httplog"
+	"github.com/go-chi/httplog/v3"
 )
 
 func main() {
