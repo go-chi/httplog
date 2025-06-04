@@ -20,9 +20,7 @@ import (
 func main() {
 	isLocalhost := os.Getenv("ENV") == "localhost"
 
-	logHandler := logHandler(isLocalhost)
-
-	logger := slog.New(logHandler)
+	logger := slog.New(logHandler(isLocalhost))
 	if !isLocalhost {
 		logger = logger.With(
 			slog.String("app", "example-app"),
@@ -45,7 +43,7 @@ func main() {
 	// Request logger
 	r.Use(httplog.RequestLogger(logger, &httplog.Options{
 		// Level defines the verbosity of the request logs:
-		// slog.LevelDebug - log both request starts & responses (incl. OPTIONS)
+		// slog.LevelDebug - log all responses (incl. OPTIONS)
 		// slog.LevelInfo  - log all responses (excl. OPTIONS)
 		// slog.LevelWarn  - log 4xx and 5xx responses only (except for 429)
 		// slog.LevelError - log 5xx responses only
@@ -78,11 +76,11 @@ func main() {
 		},
 	}))
 
+	// Set request log attribute from within middleware.
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			// Set request log attribute from within middleware.
 			httplog.SetAttrs(ctx, slog.String("user", "user1"))
 
 			next.ServeHTTP(w, r.WithContext(ctx))
@@ -109,6 +107,7 @@ func main() {
 
 		logger.WarnContext(ctx, "warn here")
 
+		w.Header().Add("Content-Type", "text/plain")
 		w.WriteHeader(200)
 		w.Write([]byte("warn here \n"))
 	})
@@ -121,15 +120,16 @@ func main() {
 		logger.ErrorContext(ctx, "msg here", slog.Any("error", err))
 
 		// Logging with the global logger also works.
-		slog.Default().With(slog.Group("ImpGroup", slog.String("account", "id"))).ErrorContext(ctx, "doesn't exist")
+		slog.Default().With(slog.Group("group", slog.String("account", "id"))).ErrorContext(ctx, "doesn't exist")
 		slog.Default().ErrorContext(ctx, "oops, error occurred")
 
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(500)
 		w.Write([]byte(fmt.Sprintf(`{"error": "%v"}`, err)))
 	})
 
-	r.Post("/upper", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "xapplication/json")
+	r.Post("/string/to/upper", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 
 		var payload struct {
 			Data string `json:"data"`
@@ -162,9 +162,9 @@ func main() {
 	fmt.Println("  curl -v http://localhost:8000/info")
 	fmt.Println("  curl -v http://localhost:8000/warn")
 	fmt.Println("  curl -v http://localhost:8000/err")
-	fmt.Println(`  curl -v http://localhost:8000/upper -X POST --json '{"data": "valid payload"}'`)
-	fmt.Println(`  curl -v http://localhost:8000/upper -X POST --json '{"data": "valid payload"}' -H "Debug: reveal-logs"`)
-	fmt.Println(`  curl -v http://localhost:8000/upper -X POST --json '{"xx": "invalid payload"}'`)
+	fmt.Println(`  curl -v http://localhost:8000/string/to/upper -X POST --json '{"data": "valid payload"}'`)
+	fmt.Println(`  curl -v http://localhost:8000/string/to/upper -X POST --json '{"data": "valid payload"}' -H "Debug: reveal-body-logs"`)
+	fmt.Println(`  curl -v http://localhost:8000/string/to/upper -X POST --json '{"xx": "invalid payload"}'`)
 	fmt.Println()
 
 	if err := http.ListenAndServe("localhost:8000", r); err != http.ErrAbortHandler {
@@ -189,5 +189,5 @@ func logHandler(isLocalhost bool) slog.Handler {
 }
 
 func isDebugHeaderSet(r *http.Request) bool {
-	return r.Header.Get("Debug") == "reveal-logs"
+	return r.Header.Get("Debug") == "reveal-body-logs"
 }

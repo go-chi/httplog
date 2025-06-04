@@ -10,15 +10,15 @@
 
 ## Features
 
-- **🚀 High Performance**: Minimal overhead request/response capture
+- **🚀 High Performance**: Minimal overhead
 - **📋 Structured Logging**: Built on Go's standard `log/slog` package
-- **📊 Schema Support**: Compatible with ECS, OTEL, and GCP logging schemas
 - **🎯 Smart Log Levels**: Auto-assigns levels by status code (5xx = error, 4xx = warn)
+- **📊 Schema Support**: Compatible with ECS, OTEL, and GCP logging formats
 - **🛡️ Panic Recovery**: Recovers panics with stack traces and HTTP 500 responses
 - **🔍 Body Logging**: Conditional request/response body capture with content-type filtering
+- **📝 Custom Attributes**: Add log attributes from handlers and middlewares
 - **🎨 Developer Friendly**: Concise mode and `curl` command generation
 - **🔗 Router Agnostic**: Works with [Chi](https://github.com/go-chi/chi), Gin, Echo, and standard `http.ServeMux`
-- **📝 Custom Attributes**: Add log attributes from handlers and middlewares
 
 ## Usage
 
@@ -52,15 +52,13 @@ func main() {
 	// Request logger
 	r.Use(httplog.RequestLogger(logger, &httplog.Options{
 		// Level defines the verbosity of the request logs:
-		// slog.LevelDebug - log both request starts & responses (incl. OPTIONS)
-		// slog.LevelInfo  - log all responses (excl. OPTIONS)
+		// slog.LevelDebug - log all responses (incl. OPTIONS)
+		// slog.LevelInfo  - log responses (excl. OPTIONS)
 		// slog.LevelWarn  - log 4xx and 5xx responses only (except for 429)
 		// slog.LevelError - log 5xx responses only
 		Level: slog.LevelInfo,
 
 		// Set log output to Elastic Common Schema (ECS) format.
-		//
-		// NOTE: Append .Concise(true) to reduce log verbosity, e.g. for localhost development.
 		Schema: httplog.SchemaECS,
 
 		// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
@@ -73,7 +71,7 @@ func main() {
 		LogRequestHeaders:  []string{"Origin"},
 		LogResponseHeaders: []string{},
 
-		// Enable logging of request/request body. Useful for debugging.
+		// Enable logging of request/request body conditionally. Useful for debugging.
 		LogRequestBody:  isDebugHeaderSet,
 		LogResponseBody: isDebugHeaderSet,
 	}))
@@ -97,20 +95,20 @@ func main() {
 }
 
 func isDebugHeaderSet(r *http.Request) bool {
-	return r.Header.Get("Debug") == "reveal-logs"
+	return r.Header.Get("Debug") == "reveal-body-logs"
 }
 ```
 
 ## Example
 
-See [_example/main.go](./_example/main.go). Try running it locally:
+See [_example/main.go](./_example/main.go) and try it locally:
 ```sh
 $ cd _example
 
-# JSON logger
+# JSON logger (production)
 $ go run .
 
-# pretty logger
+# Pretty logger (localhost)
 $ ENV=localhost go run .
 ```
 

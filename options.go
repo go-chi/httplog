@@ -12,20 +12,21 @@ type Options struct {
 	// slog.LevelWarn  - log 4xx and 5xx responses only (except for 429)
 	// slog.LevelError - log 5xx responses only
 	//
-	// Use httplog.SetLevel(ctx, slog.DebugLevel) to override the level per-request.
+	// You can override the level with a custom slog.Handler, e.g. on per-request basis.
 	Level slog.Level
 
-	// Schema defines the format of the request log attributes:
+	// Schema defines the mapping of semantic log fields to their corresponding
+	// field names in different logging systems and standards.
+	//
+	// This enables log output in different formats compatible with various logging
+	// platforms and standards (ECS, OTEL, GCP, etc.) by providing the schema.
+	//
 	// httplog.SchemaECS (Elastic Common Schema)
 	// httplog.SchemaOTEL (OpenTelemetry)
 	// httplog.SchemaGCP (Google Cloud Platform)
 	//
 	// Append .Concise(true) to reduce log verbosity, e.g. for localhost development.
 	Schema Schema
-
-	// Concise mode causes fewer log attributes to be printed in request logs.
-	// This is useful if your console is too noisy during development.
-	Concise bool
 
 	// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 	// and middlewares and returns HTTP 500 unless response status was already set.
@@ -61,7 +62,7 @@ type Options struct {
 	LogResponseBody func(req *http.Request) bool
 
 	// LogBodyContentTypes defines a list of body Content-Types that are safe to be logged
-	// with LogRequestCURL, LogRequestBody or LogResponseBody options.
+	// with LogRequestBody or LogResponseBody options.
 	//
 	// If not provided, the default is ["application/json", "application/xml", "text/plain", "text/csv", "application/x-www-form-urlencoded", ""].
 	LogBodyContentTypes []string
@@ -91,6 +92,7 @@ type Options struct {
 
 var defaultOptions = Options{
 	Level:               slog.LevelInfo,
+	Schema:              SchemaECS,
 	RecoverPanics:       true,
 	LogRequestHeaders:   []string{"Content-Type", "Origin"},
 	LogResponseHeaders:  []string{"Content-Type"},
