@@ -24,7 +24,10 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 	if o.LogBodyMaxLen == 0 {
 		o.LogBodyMaxLen = defaultOptions.LogBodyMaxLen
 	}
-	f := o.Format
+	s := o.Schema
+	if (s == Schema{}) {
+		s = SchemaECS // Default to ECS schema if no schema is provided.
+	}
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +64,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 						defer panic(rec)
 					}
 
-					logAttrs = appendAttrs(logAttrs, slog.String(f.Error, fmt.Sprintf("panic: %v", rec)))
+					logAttrs = appendAttrs(logAttrs, slog.String(s.Error, fmt.Sprintf("panic: %v", rec)))
 
 					if rec != http.ErrAbortHandler {
 						pc := make([]uintptr, 10)   // Capture up to 10 stack frames.
@@ -76,7 +79,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 								stackValues = append(stackValues, fmt.Sprintf("%s:%d", frame.File, frame.Line))
 							}
 						}
-						logAttrs = appendAttrs(logAttrs, slog.Any(f.ErrorStackTrace, stackValues))
+						logAttrs = appendAttrs(logAttrs, slog.Any(s.ErrorStackTrace, stackValues))
 					}
 				}
 
@@ -103,38 +106,38 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				}
 
 				logAttrs = appendAttrs(logAttrs,
-					slog.String(f.Timestamp, start.Format(time.RFC3339)),
-					slog.String(f.Level, lvl.String()),
-					slog.String(f.Message, fmt.Sprintf("%s %s => HTTP %v (%v)", r.Method, r.URL, statusCode, duration)),
-					slog.String(f.RequestURL, requestURL(r)),
-					slog.String(f.RequestMethod, r.Method),
-					slog.String(f.RequestPath, r.URL.Path),
-					slog.String(f.RequestRemoteIP, r.RemoteAddr),
-					slog.String(f.RequestHost, r.Host),
-					slog.String(f.RequestScheme, scheme(r)),
-					slog.String(f.RequestProto, r.Proto),
-					slog.Any(f.RequestHeaders, slog.GroupValue(getHeaderAttrs(r.Header, o.LogRequestHeaders)...)),
-					slog.Int64(f.RequestBytes, r.ContentLength),
-					slog.String(f.RequestUserAgent, r.UserAgent()),
-					slog.String(f.RequestReferer, r.Referer()),
-					slog.Any(f.ResponseHeaders, slog.GroupValue(getHeaderAttrs(ww.Header(), o.LogResponseHeaders)...)),
-					slog.Int(f.ResponseStatus, statusCode),
-					slog.Float64(f.ResponseDuration, float64(duration.Milliseconds())),
-					slog.Int(f.ResponseBytes, ww.BytesWritten()),
+					slog.String(s.Timestamp, start.Format(time.RFC3339)),
+					slog.String(s.Level, lvl.String()),
+					slog.String(s.Message, fmt.Sprintf("%s %s => HTTP %v (%v)", r.Method, r.URL, statusCode, duration)),
+					slog.String(s.RequestURL, requestURL(r)),
+					slog.String(s.RequestMethod, r.Method),
+					slog.String(s.RequestPath, r.URL.Path),
+					slog.String(s.RequestRemoteIP, r.RemoteAddr),
+					slog.String(s.RequestHost, r.Host),
+					slog.String(s.RequestScheme, scheme(r)),
+					slog.String(s.RequestProto, r.Proto),
+					slog.Any(s.RequestHeaders, slog.GroupValue(getHeaderAttrs(r.Header, o.LogRequestHeaders)...)),
+					slog.Int64(s.RequestBytes, r.ContentLength),
+					slog.String(s.RequestUserAgent, r.UserAgent()),
+					slog.String(s.RequestReferer, r.Referer()),
+					slog.Any(s.ResponseHeaders, slog.GroupValue(getHeaderAttrs(ww.Header(), o.LogResponseHeaders)...)),
+					slog.Int(s.ResponseStatus, statusCode),
+					slog.Float64(s.ResponseDuration, float64(duration.Milliseconds())),
+					slog.Int(s.ResponseBytes, ww.BytesWritten()),
 				)
 
 				if logReqBody || o.LogExtraAttrs != nil {
 					// Ensure the request body is fully read if the underlying HTTP handler didn't do so.
 					n, _ := io.Copy(io.Discard, r.Body)
 					if n > 0 {
-						logAttrs = appendAttrs(logAttrs, slog.Any(f.RequestBytesUnread, n))
+						logAttrs = appendAttrs(logAttrs, slog.Any(s.RequestBytesUnread, n))
 					}
 				}
 				if logReqBody {
-					logAttrs = appendAttrs(logAttrs, slog.String(f.RequestBody, logBody(&reqBody, r.Header, o)))
+					logAttrs = appendAttrs(logAttrs, slog.String(s.RequestBody, logBody(&reqBody, r.Header, o)))
 				}
 				if logRespBody {
-					logAttrs = appendAttrs(logAttrs, slog.String(f.ResponseBody, logBody(&respBody, ww.Header(), o)))
+					logAttrs = appendAttrs(logAttrs, slog.String(s.ResponseBody, logBody(&respBody, ww.Header(), o)))
 				}
 				if o.LogExtraAttrs != nil {
 					logAttrs = appendAttrs(logAttrs, o.LogExtraAttrs(r, reqBody.String(), statusCode)...)
@@ -142,8 +145,8 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				logAttrs = appendAttrs(logAttrs, getAttrs(ctx)...)
 
 				// Group attributes into nested objects, e.g. for GCP structured logs.
-				if f.GroupDelimiter != "" {
-					logAttrs = groupAttrs(logAttrs, f.GroupDelimiter)
+				if s.GroupDelimiter != "" {
+					logAttrs = groupAttrs(logAttrs, s.GroupDelimiter)
 				}
 
 				msg := fmt.Sprintf("%s %s => HTTP %v (%v)", r.Method, r.URL, statusCode, duration)

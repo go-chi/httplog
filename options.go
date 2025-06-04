@@ -15,9 +15,9 @@ type Options struct {
 	// Use httplog.SetLevel(ctx, slog.DebugLevel) to override the level per-request.
 	Level slog.Level
 
-	// Format defines the format of the request log attributes.
-	// If not provided, the default is Elastic Common Schema (ECS).
-	Format Format
+	// Schema defines the format of the request log attributes.
+	// If not provided, the default is Elastic Common Schema (SchemaECS).
+	Schema Schema
 
 	// Concise mode causes fewer log attributes to be printed in request logs.
 	// This is useful if your console is too noisy during development.
