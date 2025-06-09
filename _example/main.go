@@ -12,9 +12,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/httplog/v3"
 	"github.com/go-chi/traceid"
 	"github.com/golang-cz/devslog"
-	"github.com/go-chi/httplog/v3"
 )
 
 func main() {
@@ -42,13 +42,6 @@ func main() {
 
 	// Request logger
 	r.Use(httplog.RequestLogger(logger, &httplog.Options{
-		// Level defines the verbosity of the request logs:
-		// slog.LevelDebug - log all responses (incl. OPTIONS)
-		// slog.LevelInfo  - log all responses (excl. OPTIONS)
-		// slog.LevelWarn  - log 4xx and 5xx responses only (except for 429)
-		// slog.LevelError - log 5xx responses only
-		Level: slog.LevelInfo,
-
 		// Use Elastic Common Schema (SchemaECS) log output format.
 		Schema: httplog.SchemaECS.Concise(isLocalhost),
 

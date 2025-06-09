@@ -41,7 +41,7 @@ import (
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With(
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LogInfo})).With(
 		slog.String("app", "example-app"),
 		slog.String("version", "v1.0.0-a1fa420"),
 		slog.String("env", "production"),
@@ -51,13 +51,6 @@ func main() {
 
 	// Request logger
 	r.Use(httplog.RequestLogger(logger, &httplog.Options{
-		// Level defines the verbosity of the request logs:
-		// slog.LevelDebug - log all responses (incl. OPTIONS)
-		// slog.LevelInfo  - log responses (excl. OPTIONS)
-		// slog.LevelWarn  - log 4xx and 5xx responses only (except for 429)
-		// slog.LevelError - log 5xx responses only
-		Level: slog.LevelInfo,
-
 		// Set log output to Elastic Common Schema (ECS) format.
 		Schema: httplog.SchemaECS,
 

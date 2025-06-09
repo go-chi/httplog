@@ -105,8 +105,8 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					lvl = slog.LevelInfo
 				}
 
-				// Skip logging if the message level is below the logger's level or the minimum level specified in options
-				if !logger.Enabled(ctx, lvl) || lvl < o.Level {
+				// Skip logging if the message level is below the logger's level
+				if !logger.Enabled(ctx, lvl) {
 					return
 				}
 
