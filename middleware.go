@@ -3,6 +3,7 @@ package httplog
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -12,6 +13,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
+)
+
+var (
+	ErrClientDisconnected = fmt.Errorf("client disconnected before response was sent")
 )
 
 func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Handler {
@@ -64,7 +69,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 						defer panic(rec)
 					}
 
-					logAttrs = appendAttrs(logAttrs, slog.String(s.Error, fmt.Sprintf("panic: %v", rec)))
+					logAttrs = appendAttrs(logAttrs, slog.String(s.ErrorMessage, fmt.Sprintf("panic: %v", rec)))
 
 					if rec != http.ErrAbortHandler {
 						pc := make([]uintptr, 10)   // Capture up to 10 stack frames.
@@ -85,6 +90,11 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 
 				duration := time.Since(start)
 				statusCode := ww.Status()
+				if statusCode == 0 {
+					// If the handler never explicitly calls w.WriteHeader(statusCode),
+					// Go's http package automatically sends HTTP 200 OK to the client.
+					statusCode = 200
+				}
 
 				// Skip logging if the request is filtered by the Skip function.
 				if o.Skip != nil && o.Skip(r, statusCode) {
@@ -130,6 +140,10 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					slog.Float64(s.ResponseDuration, float64(duration.Milliseconds())),
 					slog.Int(s.ResponseBytes, ww.BytesWritten()),
 				)
+
+				if err := ctx.Err(); errors.Is(err, context.Canceled) {
+					logAttrs = appendAttrs(logAttrs, slog.String(s.ErrorMessage, ErrClientDisconnected.Error()), slog.String(s.ErrorType, "ClientDisconnected"))
+				}
 
 				if logReqBody || o.LogExtraAttrs != nil {
 					// Ensure the request body is fully read if the underlying HTTP handler didn't do so.
