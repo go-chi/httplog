@@ -4,5 +4,7 @@ github.com/go-chi/traceid v0.3.0 h1:BYITxMnIeQasU7/U7+InZWANWxVZeCUBGTAqWleQOeg=
 github.com/go-chi/traceid v0.3.0/go.mod h1:XFfEEYZjqgML4ySh+wYBU29eqJkc2um7oEzgIc63e74=
 github.com/golang-cz/devslog v0.0.9 h1:GU59V626sUccMjytKhewgN3teduXtx/itoQs78NaPdE=
 github.com/golang-cz/devslog v0.0.9/go.mod h1:bSe5bm0A7Nyfqtijf1OMNgVJHlWEuVSXnkuASiE1vV8=
+github.com/golang-cz/devslog v0.0.14 h1:hZY6VuZ/+MmG4djP9X1YDSmX/z5zPDDVgFlO0fyb+CY=
+github.com/golang-cz/devslog v0.0.14/go.mod h1:bSe5bm0A7Nyfqtijf1OMNgVJHlWEuVSXnkuASiE1vV8=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=

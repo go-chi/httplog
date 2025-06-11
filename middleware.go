@@ -30,8 +30,8 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 		o.LogBodyMaxLen = defaultOptions.LogBodyMaxLen
 	}
 	s := o.Schema
-	if (s == Schema{}) {
-		s = SchemaECS // Default to ECS schema if no schema is provided.
+	if s == nil {
+		s = SchemaECS
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -121,9 +121,6 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				}
 
 				logAttrs = appendAttrs(logAttrs,
-					slog.String(s.Timestamp, start.Format(time.RFC3339)),
-					slog.String(s.Level, lvl.String()),
-					slog.String(s.Message, fmt.Sprintf("%s %s => HTTP %v (%v)", r.Method, r.URL, statusCode, duration)),
 					slog.String(s.RequestURL, requestURL(r)),
 					slog.String(s.RequestMethod, r.Method),
 					slog.String(s.RequestPath, r.URL.Path),

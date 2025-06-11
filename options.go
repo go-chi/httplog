@@ -26,7 +26,7 @@ type Options struct {
 	// httplog.SchemaGCP (Google Cloud Platform)
 	//
 	// Append .Concise(true) to reduce log verbosity, e.g. for localhost development.
-	Schema Schema
+	Schema *Schema
 
 	// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 	// and middlewares and returns HTTP 500 unless response status was already set.
