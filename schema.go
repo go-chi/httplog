@@ -10,8 +10,9 @@ type Schema struct {
 	Timestamp       string // Timestamp of the log entry
 	Level           string // Log level (info, warn, error, etc.)
 	Message         string // Primary log message
-	Error           string // Error message when an error occurs
-	ErrorStackTrace string // Stack trace for errors
+	ErrorMessage    string // Error message when an error occurs
+	ErrorType       string // Low-cardinality error type ("ClientDisconnected", "ValidationError", etc.)
+	ErrorStackTrace string // Stack trace for panic or error
 
 	// Request attributes for the incoming HTTP request.
 	// NOTE: RequestQuery is intentionally not supported as it would likely leak sensitive data.
@@ -42,7 +43,7 @@ type Schema struct {
 }
 
 var (
-	// SchemaECS represents the Elastic Common Schema (SchemaECS) version 9.0.0.
+	// SchemaECS represents the Elastic Common Schema (ECS) version 9.0.0.
 	// This schema is widely used with Elasticsearch and the Elastic Stack.
 	//
 	// Reference: https://www.elastic.co/guide/en/ecs/current/ecs-http.html
@@ -50,7 +51,8 @@ var (
 		Timestamp:          "@timestamp",
 		Level:              "log.level",
 		Message:            "message",
-		Error:              "error.message",
+		ErrorMessage:       "error.message",
+		ErrorType:          "error.type",
 		ErrorStackTrace:    "error.stack_trace",
 		RequestURL:         "url.full",
 		RequestMethod:      "http.request.method",
@@ -72,7 +74,7 @@ var (
 		ResponseBytes:      "http.response.body.bytes",
 	}
 
-	// SchemaOTEL represents OpenTelemetry (SchemaOTEL) semantic conventions version 1.34.0.
+	// SchemaOTEL represents OpenTelemetry (OTEL) semantic conventions version 1.34.0.
 	// This schema follows OpenTelemetry standards for observability data.
 	//
 	// Reference: https://opentelemetry.io/docs/specs/semconv/http/http-metrics
@@ -80,7 +82,8 @@ var (
 		Timestamp:          "timestamp",
 		Level:              "severity_text",
 		Message:            "body",
-		Error:              "exception.message",
+		ErrorMessage:       "error.message",
+		ErrorType:          "error.type",
 		ErrorStackTrace:    "exception.stacktrace",
 		RequestURL:         "url.full",
 		RequestMethod:      "http.request.method",
@@ -112,8 +115,9 @@ var (
 		Timestamp:          "timestamp",
 		Level:              "severity",
 		Message:            "message",
-		Error:              "error",
-		ErrorStackTrace:    "stack_trace",
+		ErrorMessage:       "error.message",
+		ErrorType:          "error.type",
+		ErrorStackTrace:    "error.stack_trace",
 		RequestURL:         "httpRequest.requestUrl",
 		RequestMethod:      "httpRequest.requestMethod",
 		RequestPath:        "httpRequest.requestPath",
@@ -146,7 +150,8 @@ func (s Schema) Concise(concise bool) Schema {
 	}
 
 	return Schema{
-		Error:              s.Error,
+		ErrorMessage:       s.ErrorMessage,
+		ErrorType:          s.ErrorType,
 		ErrorStackTrace:    s.ErrorStackTrace,
 		RequestHeaders:     s.RequestHeaders,
 		RequestBody:        s.RequestBody,

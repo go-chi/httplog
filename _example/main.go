@@ -9,12 +9,13 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/httplog/v3"
 	"github.com/go-chi/traceid"
 	"github.com/golang-cz/devslog"
-	"github.com/go-chi/httplog/v3"
 )
 
 func main() {
@@ -49,7 +50,7 @@ func main() {
 		// slog.LevelError - log 5xx responses only
 		Level: slog.LevelInfo,
 
-		// Use Elastic Common Schema (SchemaECS) log output format.
+		// Use Elastic Common Schema (ECS) log output format.
 		Schema: httplog.SchemaECS.Concise(isLocalhost),
 
 		// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
@@ -92,8 +93,14 @@ func main() {
 		})
 	})
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("hello world \n"))
+	r.Get("/slow", func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-time.After(5 * time.Second):
+			w.Write([]byte("slow operation completed \n"))
+
+		case <-r.Context().Done():
+			// client disconnected
+		}
 	})
 
 	r.Get("/panic", func(w http.ResponseWriter, r *http.Request) {
@@ -122,11 +129,14 @@ func main() {
 
 		// Log error explicitly.
 		err := errors.New("err here")
-		logger.ErrorContext(ctx, "msg here", slog.Any("error", err))
+		logger.ErrorContext(ctx, "msg here", slog.String("error", err.Error()))
 
 		// Logging with the global logger also works.
 		slog.Default().With(slog.Group("group", slog.String("account", "id"))).ErrorContext(ctx, "doesn't exist")
 		slog.Default().ErrorContext(ctx, "oops, error occurred")
+
+		// Or, set the error attribute on the request log.
+		httplog.SetError(ctx, err)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(500)
@@ -134,19 +144,24 @@ func main() {
 	})
 
 	r.Post("/string/to/upper", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		w.Header().Set("Content-Type", "application/json")
 
 		var payload struct {
 			Data string `json:"data"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			err = fmt.Errorf("invalid json: %w", err)
+
 			w.WriteHeader(400)
-			w.Write([]byte(fmt.Sprintf(`{"error": %q}`, fmt.Errorf("invalid json: %w", err))))
+			w.Write([]byte(fmt.Sprintf(`{"error": %q}`, httplog.SetError(ctx, err))))
 			return
 		}
 		if payload.Data == "" {
+			err := errors.New("data field is required")
+
 			w.WriteHeader(422)
-			w.Write([]byte(`{"error": "data field is required"}`))
+			w.Write([]byte(fmt.Sprintf(`{"error": %q}`, httplog.SetError(ctx, err))))
 			return
 		}
 
@@ -162,11 +177,11 @@ func main() {
 	}
 
 	fmt.Println("Try these commands from a new terminal window:")
-	fmt.Println("  curl -v http://localhost:8000")
-	fmt.Println("  curl -v http://localhost:8000/panic")
 	fmt.Println("  curl -v http://localhost:8000/info")
 	fmt.Println("  curl -v http://localhost:8000/warn")
 	fmt.Println("  curl -v http://localhost:8000/err")
+	fmt.Println("  curl -v http://localhost:8000/panic")
+	fmt.Println("  curl -v http://localhost:8000/slow")
 	fmt.Println(`  curl -v http://localhost:8000/string/to/upper -X POST --json '{"data": "valid payload"}'`)
 	fmt.Println(`  curl -v http://localhost:8000/string/to/upper -X POST --json '{"data": "valid payload"}' -H "Debug: reveal-body-logs"`)
 	fmt.Println(`  curl -v http://localhost:8000/string/to/upper -X POST --json '{"xx": "invalid payload"}'`)
