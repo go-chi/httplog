@@ -183,13 +183,19 @@ func (s *Schema) ReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 		}
 		return slog.String(s.Message, a.Value.String())
 	case slog.SourceKey:
-		if s.SourceFile == "" {
-			return a
-		}
 		source, ok := a.Value.Any().(*slog.Source)
 		if !ok {
 			return a
 		}
+
+		if s.SourceFile == "" {
+			// Ignore httplog.RequestLogger middleware source.
+			if strings.Contains(source.File, "go-chi/httplog") {
+				return slog.Attr{}
+			}
+			return a
+		}
+
 		if s.GroupDelimiter == "" {
 			return slog.Group("", slog.String(s.SourceFile, source.File), slog.Int(s.SourceLine, source.Line), slog.String(s.SourceFunction, source.Function))
 		}
