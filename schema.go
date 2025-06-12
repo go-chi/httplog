@@ -186,7 +186,10 @@ func (s *Schema) ReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 		if s.SourceFile == "" {
 			return a
 		}
-		source := a.Value.Any().(*slog.Source)
+		source, ok := a.Value.Any().(*slog.Source)
+		if !ok {
+			return a
+		}
 		if s.GroupDelimiter == "" {
 			return slog.Group("", slog.String(s.SourceFile, source.File), slog.Int(s.SourceLine, source.Line), slog.String(s.SourceFunction, source.Function))
 		}
