@@ -21,7 +21,13 @@ import (
 func main() {
 	isLocalhost := os.Getenv("ENV") == "localhost"
 
-	logger := slog.New(logHandler(isLocalhost))
+	logFormat := httplog.SchemaECS.Concise(isLocalhost)
+
+	logger := slog.New(logHandler(isLocalhost, &slog.HandlerOptions{
+		AddSource:   !isLocalhost,
+		ReplaceAttr: logFormat.ReplaceAttr,
+	}))
+
 	if !isLocalhost {
 		logger = logger.With(
 			slog.String("app", "example-app"),
@@ -34,14 +40,13 @@ func main() {
 	slog.SetDefault(logger)
 	slog.SetLogLoggerLevel(slog.LevelError)
 
-	// Service
 	r := chi.NewRouter()
 	r.Use(middleware.Heartbeat("/ping"))
 
 	// Propagate or create new TraceId header.
 	r.Use(traceid.Middleware)
 
-	// Request logger
+	// Request logger.
 	r.Use(httplog.RequestLogger(logger, &httplog.Options{
 		// Level defines the verbosity of the request logs:
 		// slog.LevelDebug - log all responses (incl. OPTIONS)
@@ -50,8 +55,8 @@ func main() {
 		// slog.LevelError - log 5xx responses only
 		Level: slog.LevelInfo,
 
-		// Use Elastic Common Schema (ECS) log output format.
-		Schema: httplog.SchemaECS.Concise(isLocalhost),
+		// Log attributes using given schema/format.
+		Schema: logFormat,
 
 		// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 		// and middlewares. It returns HTTP 500 unless response status was already set.
@@ -192,19 +197,20 @@ func main() {
 	}
 }
 
-func logHandler(isLocalhost bool) slog.Handler {
+func logHandler(isLocalhost bool, handlerOpts *slog.HandlerOptions) slog.Handler {
 	if isLocalhost {
 		// Pretty logs for localhost development.
 		return devslog.NewHandler(os.Stdout, &devslog.Options{
 			SortKeys:           true,
 			MaxErrorStackTrace: 5,
 			MaxSlicePrintSize:  20,
+			HandlerOptions:     handlerOpts,
 		})
 	}
 
 	// JSON logs for production with "traceId".
 	return traceid.LogHandler(
-		slog.NewJSONHandler(os.Stdout, nil),
+		slog.NewJSONHandler(os.Stdout, handlerOpts),
 	)
 }
 
