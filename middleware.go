@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	errClientAborted = fmt.Errorf("client disconnected before response was sent")
+	ErrClientAborted = fmt.Errorf("request aborted: client disconnected before response was sent")
 )
 
 func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Handler {
@@ -139,7 +139,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				)
 
 				if err := ctx.Err(); errors.Is(err, context.Canceled) {
-					logAttrs = appendAttrs(logAttrs, slog.String(s.ErrorMessage, errClientAborted.Error()), slog.String(s.ErrorType, "ClientAborted"))
+					logAttrs = appendAttrs(logAttrs, slog.Any(ErrorKey, ErrClientAborted), slog.String(s.ErrorType, "ClientAborted"))
 				}
 
 				if logReqBody || o.LogExtraAttrs != nil {

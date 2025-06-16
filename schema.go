@@ -190,7 +190,7 @@ func (s *Schema) ReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 
 		if s.SourceFile == "" {
 			// Ignore httplog.RequestLogger middleware source.
-			if strings.Contains(source.File, "go-chi/httplog") {
+			if strings.Contains(source.File, "/go-chi/httplog/") {
 				return slog.Attr{}
 			}
 			return a
@@ -199,17 +199,21 @@ func (s *Schema) ReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 		if s.GroupDelimiter == "" {
 			return slog.Group("", slog.String(s.SourceFile, source.File), slog.Int(s.SourceLine, source.Line), slog.String(s.SourceFunction, source.Function))
 		}
+
 		grp, file, _ := strings.Cut(s.SourceFile, s.GroupDelimiter)
 		_, line, _ := strings.Cut(s.SourceLine, s.GroupDelimiter)
 		_, fn, _ := strings.Cut(s.SourceFunction, s.GroupDelimiter)
 		return slog.Group(grp, slog.String(file, source.File), slog.Int(line, source.Line), slog.String(fn, source.Function))
+
+	case ErrorKey:
+		return slog.Attr{Key: s.ErrorMessage, Value: a.Value}
 	}
 
 	return a
 }
 
-// Concise returns a simplified schema with essential fields only. When concise is true,
-// it reduces log output by keeping only error, request, and response details.
+// Concise returns a simplified schema with essential fields only.
+// If concise is true, it reduces log verbosity.
 //
 // This is useful for localhost development to reduce log verbosity.
 func (s *Schema) Concise(concise bool) *Schema {
@@ -219,7 +223,6 @@ func (s *Schema) Concise(concise bool) *Schema {
 
 	return &Schema{
 		ErrorMessage:       s.ErrorMessage,
-		ErrorType:          s.ErrorType,
 		ErrorStackTrace:    s.ErrorStackTrace,
 		RequestHeaders:     s.RequestHeaders,
 		RequestBody:        s.RequestBody,

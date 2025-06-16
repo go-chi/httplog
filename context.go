@@ -5,6 +5,10 @@ import (
 	"log/slog"
 )
 
+const (
+	ErrorKey = "error"
+)
+
 type ctxKeyLogAttrs struct{}
 
 func (c *ctxKeyLogAttrs) String() string {
@@ -29,7 +33,7 @@ func getAttrs(ctx context.Context) []slog.Attr {
 // SetError sets the error attribute on the request log.
 func SetError(ctx context.Context, err error) error {
 	if err != nil {
-		SetAttrs(ctx, slog.String("error.message", err.Error()))
+		SetAttrs(ctx, slog.Any(ErrorKey, err))
 	}
 
 	return err
