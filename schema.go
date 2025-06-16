@@ -14,10 +14,10 @@ import (
 type Schema struct {
 	// Base attributes for core logging information.
 	Timestamp       string // Timestamp of the log entry
-	Level           string // Log level (info, warn, error, etc.)
+	Level           string // Log level (e.g. INFO, WARNING, ERROR)
 	Message         string // Primary log message
 	ErrorMessage    string // Error message when an error occurs
-	ErrorType       string // Low-cardinality error type ("ClientDisconnected", "ValidationError", etc.)
+	ErrorType       string // Low-cardinality error type (e.g. "ClientAborted", "ValidationError")
 	ErrorStackTrace string // Stack trace for panic or error
 
 	// Source code location attributes for tracking origin of log statements.
@@ -28,12 +28,12 @@ type Schema struct {
 	// Request attributes for the incoming HTTP request.
 	// NOTE: RequestQuery is intentionally not supported as it would likely leak sensitive data.
 	RequestURL         string // Full request URL
-	RequestMethod      string // HTTP method (GET, POST, etc.)
+	RequestMethod      string // HTTP method (e.g. GET, POST)
 	RequestPath        string // URL path component
 	RequestRemoteIP    string // Client IP address
 	RequestHost        string // Host header value
 	RequestScheme      string // URL scheme (http, https)
-	RequestProto       string // HTTP protocol version (HTTP/1.1, HTTP/2, etc.)
+	RequestProto       string // HTTP protocol version (e.g. HTTP/1.1, HTTP/2)
 	RequestHeaders     string // Selected request headers
 	RequestBody        string // Request body content, if logged.
 	RequestBytes       string // Size of request body in bytes
