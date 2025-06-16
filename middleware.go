@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	ErrClientDisconnected = fmt.Errorf("client disconnected before response was sent")
+	ErrClientAborted = fmt.Errorf("request aborted: client disconnected before response was sent")
 )
 
 func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Handler {
@@ -91,7 +91,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				duration := time.Since(start)
 				statusCode := ww.Status()
 				if statusCode == 0 {
-					// If the handler never explicitly calls w.WriteHeader(statusCode),
+					// If the handler never calls w.WriteHeader(statusCode) explicitly,
 					// Go's http package automatically sends HTTP 200 OK to the client.
 					statusCode = 200
 				}
@@ -139,7 +139,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				)
 
 				if err := ctx.Err(); errors.Is(err, context.Canceled) {
-					logAttrs = appendAttrs(logAttrs, slog.String(s.ErrorMessage, ErrClientDisconnected.Error()), slog.String(s.ErrorType, "ClientDisconnected"))
+					logAttrs = appendAttrs(logAttrs, slog.Any(ErrorKey, ErrClientAborted), slog.String(s.ErrorType, "ClientAborted"))
 				}
 
 				if logReqBody || o.LogExtraAttrs != nil {

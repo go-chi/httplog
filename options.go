@@ -12,7 +12,7 @@ type Options struct {
 	// slog.LevelWarn  - log 4xx and 5xx responses only (except for 429)
 	// slog.LevelError - log 5xx responses only
 	//
-	// You can override the level with a custom slog.Handler, e.g. on per-request basis.
+	// You can override the level with a custom slog.Handler (e.g. on per-request basis).
 	Level slog.Level
 
 	// Schema defines the mapping of semantic log fields to their corresponding
@@ -25,7 +25,7 @@ type Options struct {
 	// httplog.SchemaOTEL (OpenTelemetry)
 	// httplog.SchemaGCP (Google Cloud Platform)
 	//
-	// Append .Concise(true) to reduce log verbosity, e.g. for localhost development.
+	// Append .Concise(true) to reduce log verbosity (e.g. for localhost development).
 	Schema *Schema
 
 	// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
