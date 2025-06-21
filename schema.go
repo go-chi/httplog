@@ -132,31 +132,31 @@ var (
 		Timestamp:          "timestamp",
 		Level:              "severity",
 		Message:            "message",
-		ErrorMessage:       "error:message",
-		ErrorType:          "error:type",
-		ErrorStackTrace:    "error:stack_trace",
-		SourceFile:         "logging.googleapis.com/sourceLocation:file",
-		SourceLine:         "logging.googleapis.com/sourceLocation:line",
-		SourceFunction:     "logging.googleapis.com/sourceLocation:function",
-		RequestURL:         "httpRequest:requestUrl",
-		RequestMethod:      "httpRequest:requestMethod",
-		RequestPath:        "httpRequest:requestPath",
-		RequestRemoteIP:    "httpRequest:remoteIp",
-		RequestHost:        "httpRequest:host",
-		RequestScheme:      "httpRequest:scheme",
-		RequestProto:       "httpRequest:protocol",
-		RequestHeaders:     "httpRequest:requestHeaders",
-		RequestBody:        "httpRequest:requestBody",
-		RequestBytes:       "httpRequest:requestSize",
-		RequestBytesUnread: "httpRequest:requestUnreadSize",
-		RequestUserAgent:   "httpRequest:userAgent",
-		RequestReferer:     "httpRequest:referer",
-		ResponseHeaders:    "httpRequest:responseHeaders",
-		ResponseBody:       "httpRequest:responseBody",
-		ResponseStatus:     "httpRequest:status",
-		ResponseDuration:   "httpRequest:latency",
-		ResponseBytes:      "httpRequest:responseSize",
-		GroupDelimiter:     ":",
+		ErrorMessage:       "error",
+		ErrorType:          "error_type",
+		ErrorStackTrace:    "stack_trace",
+		SourceFile:         "sourceLocation.file",
+		SourceLine:         "sourceLocation.line",
+		SourceFunction:     "sourceLocation.function",
+		RequestURL:         "httpRequest.requestUrl",
+		RequestMethod:      "httpRequest.requestMethod",
+		RequestPath:        "httpRequest.requestPath",
+		RequestRemoteIP:    "httpRequest.remoteIp",
+		RequestHost:        "httpRequest.host",
+		RequestScheme:      "httpRequest.scheme",
+		RequestProto:       "httpRequest.protocol",
+		RequestHeaders:     "httpRequest.requestHeaders",
+		RequestBody:        "httpRequest.requestBody",
+		RequestBytes:       "httpRequest.requestSize",
+		RequestBytesUnread: "httpRequest.requestUnreadSize",
+		RequestUserAgent:   "httpRequest.userAgent",
+		RequestReferer:     "httpRequest.referer",
+		ResponseHeaders:    "httpRequest.responseHeaders",
+		ResponseBody:       "httpRequest.responseBody",
+		ResponseStatus:     "httpRequest.status",
+		ResponseDuration:   "httpRequest.latency",
+		ResponseBytes:      "httpRequest.responseSize",
+		GroupDelimiter:     ".",
 	}
 )
 
@@ -206,7 +206,16 @@ func (s *Schema) ReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 		return slog.Group(grp, slog.String(file, source.File), slog.Int(line, source.Line), slog.String(fn, source.Function))
 
 	case ErrorKey:
-		return slog.Attr{Key: s.ErrorMessage, Value: a.Value}
+		if s.GroupDelimiter == "" {
+			return slog.Attr{Key: s.ErrorMessage, Value: a.Value}
+		}
+
+		grp, errMsg, found := strings.Cut(s.ErrorMessage, s.GroupDelimiter)
+		if !found {
+			return slog.Attr{Key: s.ErrorMessage, Value: a.Value}
+		}
+
+		return slog.Group(grp, slog.Attr{Key: errMsg, Value: a.Value})
 	}
 
 	return a
