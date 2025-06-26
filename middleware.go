@@ -153,11 +153,12 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					logAttrs = appendAttrs(logAttrs, slog.Any(ErrorKey, ErrClientAborted), slog.String(s.ErrorType, "ClientAborted"))
 				}
 
+				var reqUnreadBytes int64
 				if consumeBody {
 					// Ensure the request body is fully read if the underlying HTTP handler didn't do so.
-					n, _ := io.Copy(io.Discard, r.Body)
-					if n > 0 {
-						logAttrs = appendAttrs(logAttrs, slog.Any(s.RequestBytesUnread, n))
+					reqUnreadBytes, _ = io.Copy(io.Discard, r.Body)
+					if reqUnreadBytes > 0 {
+						logAttrs = appendAttrs(logAttrs, slog.Int64(s.RequestBytesUnread, reqUnreadBytes))
 					}
 				}
 				if logReqBody {
@@ -169,9 +170,11 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				if o.LogAdditionalAttrs != nil {
 					if o.LogAdditionalAttrs.AdditionalAttrs != nil {
 						logAttrs = appendAttrs(logAttrs, o.LogAdditionalAttrs.AdditionalAttrs(&LogDetails{
-							Request:        r,
-							RequestBody:    reqBody.String(),
-							ResponseStatus: statusCode,
+							Request:            r,
+							RequestBody:        reqBody.String(),
+							RequestBytesUnread: reqUnreadBytes,
+							ResponseStatus:     statusCode,
+							ResponseBytes:      ww.BytesWritten(),
 						})...)
 					}
 				} else if o.LogExtraAttrs != nil {

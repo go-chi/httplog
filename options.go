@@ -144,6 +144,9 @@ type LogAdditionalAttrsOptions struct {
 type LogDetails struct {
 	Request *http.Request
 	// Contains the request body if either Options.LogRequestBody or LogAdditionalAttrsOptions.IncludeRequestBody is true, otherwise it is empty.
-	RequestBody    string
-	ResponseStatus int
+	RequestBody string
+	// Contains the number of unread bytes from the request body if either Options.LogRequestBody or LogAdditionalAttrsOptions.IncludeRequestBody is true, otherwise it is 0.
+	RequestBytesUnread int64
+	ResponseStatus     int
+	ResponseBytes      int
 }
