@@ -3,6 +3,7 @@ package httplog
 import (
 	"context"
 	"log/slog"
+	"sync"
 )
 
 const (
@@ -15,16 +16,35 @@ func (c *ctxKeyLogAttrs) String() string {
 	return "httplog attrs context"
 }
 
+type logData struct {
+	mu    sync.RWMutex
+	attrs []slog.Attr
+}
+
 // SetAttrs sets the attributes on the request log.
 func SetAttrs(ctx context.Context, attrs ...slog.Attr) {
-	if ptr, ok := ctx.Value(ctxKeyLogAttrs{}).(*[]slog.Attr); ok && ptr != nil {
-		*ptr = append(*ptr, attrs...)
+	if ptr, ok := ctx.Value(ctxKeyLogAttrs{}).(*logData); ok && ptr != nil {
+		ptr.mu.Lock()
+		defer ptr.mu.Unlock()
+		ptr.attrs = append(ptr.attrs, attrs...)
+	}
+}
+
+func lockData(ctx context.Context) {
+	if ptr, ok := ctx.Value(ctxKeyLogAttrs{}).(*logData); ok && ptr != nil {
+		ptr.mu.RLock()
+	}
+}
+
+func unlockData(ctx context.Context) {
+	if ptr, ok := ctx.Value(ctxKeyLogAttrs{}).(*logData); ok && ptr != nil {
+		ptr.mu.RUnlock()
 	}
 }
 
 func getAttrs(ctx context.Context) []slog.Attr {
-	if ptr, ok := ctx.Value(ctxKeyLogAttrs{}).(*[]slog.Attr); ok && ptr != nil {
-		return *ptr
+	if ptr, ok := ctx.Value(ctxKeyLogAttrs{}).(*logData); ok && ptr != nil {
+		return ptr.attrs
 	}
 
 	return nil
