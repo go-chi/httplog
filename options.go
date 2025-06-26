@@ -94,7 +94,15 @@ type Options struct {
 	// }
 	//
 	// WARNING: Be careful not to leak any sensitive information in the logs.
+	//
+	// Deprecated: Use LogAdditionalAttrs instead. Will be ignored if LogAdditionalAttrs is set.
 	LogExtraAttrs func(req *http.Request, reqBody string, respStatus int) []slog.Attr
+
+	// LogAdditionalAttrs is an optional way for you to add additional attributes to the
+	// request log.
+	//
+	// WARNING: Be careful not to leak any sensitive information in the logs.
+	LogAdditionalAttrs *LogAdditionalAttrsOptions
 }
 
 var defaultOptions = Options{
@@ -105,4 +113,37 @@ var defaultOptions = Options{
 	LogResponseHeaders:  []string{"Content-Type"},
 	LogBodyContentTypes: []string{"application/json", "application/xml", "text/plain", "text/csv", "application/x-www-form-urlencoded", ""},
 	LogBodyMaxLen:       1024,
+}
+
+type LogAdditionalAttrsOptions struct {
+	// IncludeRequestBody is an optional predicate function that controls if LogDetails.RequestBody passed to AdditionalAttrs will contain the full request body.
+	//
+	// If the function returns true or if Options.LogRequestBody returns true, the request body will be passed in LogDetails.RequestBody.
+	// If false or not set and Options.LogRequestBody is not set or returns false, an empty string will be passed in LogDetails.RequestBody.
+	//
+	// WARNING: Do not leak any request bodies with sensitive information.
+	IncludeRequestBody func(req *http.Request) bool
+	// AdditionalAttrs is an optional way for you to add additional attributes to the
+	// request log.
+	//
+	// Example:
+	//
+	// // Log all requests with invalid payload as curl command.
+	// func(ld *LogDetails) []slog.Attr {
+	//     if ld.ResponseStatus == 400 || ld.ResponseStatus == 422 {
+	// 	       ld.Request.Header.Del("Authorization")
+	//         return []slog.Attr{slog.String("curl", httplog.CURL(req, reqBody))}
+	// 	   }
+	// 	   return nil
+	// }
+	//
+	// WARNING: Be careful not to leak any sensitive information in the logs.
+	AdditionalAttrs func(ld *LogDetails) []slog.Attr
+}
+
+type LogDetails struct {
+	Request *http.Request
+	// Contains the request body if either Options.LogRequestBody or LogAdditionalAttrsOptions.IncludeRequestBody is true, otherwise it is empty.
+	RequestBody    string
+	ResponseStatus int
 }
