@@ -41,8 +41,19 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 			logReqBody := o.LogRequestBody != nil && o.LogRequestBody(r)
 			logRespBody := o.LogResponseBody != nil && o.LogResponseBody(r)
 
+			var includeAdditionalAttrsReqBody bool
+			if o.LogAdditionalAttrs != nil {
+				if o.LogAdditionalAttrs.AdditionalAttrs != nil && o.LogAdditionalAttrs.IncludeRequestBody != nil {
+					includeAdditionalAttrsReqBody = o.LogAdditionalAttrs.IncludeRequestBody(r)
+				}
+			} else if o.LogExtraAttrs != nil {
+				includeAdditionalAttrsReqBody = true
+			}
+			hasReqBody := r.Body != nil && r.Body != http.NoBody
+			consumeBody := hasReqBody && (logReqBody || includeAdditionalAttrsReqBody)
+
 			var reqBody bytes.Buffer
-			if logReqBody || o.LogExtraAttrs != nil {
+			if consumeBody {
 				r.Body = io.NopCloser(io.TeeReader(r.Body, &reqBody))
 			}
 
@@ -142,11 +153,12 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					logAttrs = appendAttrs(logAttrs, slog.Any(ErrorKey, ErrClientAborted), slog.String(s.ErrorType, "ClientAborted"))
 				}
 
-				if logReqBody || o.LogExtraAttrs != nil {
+				var reqUnreadBytes int64
+				if consumeBody {
 					// Ensure the request body is fully read if the underlying HTTP handler didn't do so.
-					n, _ := io.Copy(io.Discard, r.Body)
-					if n > 0 {
-						logAttrs = appendAttrs(logAttrs, slog.Any(s.RequestBytesUnread, n))
+					reqUnreadBytes, _ = io.Copy(io.Discard, r.Body)
+					if reqUnreadBytes > 0 {
+						logAttrs = appendAttrs(logAttrs, slog.Int64(s.RequestBytesUnread, reqUnreadBytes))
 					}
 				}
 				if logReqBody {
@@ -155,7 +167,17 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				if logRespBody {
 					logAttrs = appendAttrs(logAttrs, slog.String(s.ResponseBody, logBody(&respBody, ww.Header(), o)))
 				}
-				if o.LogExtraAttrs != nil {
+				if o.LogAdditionalAttrs != nil {
+					if o.LogAdditionalAttrs.AdditionalAttrs != nil {
+						logAttrs = appendAttrs(logAttrs, o.LogAdditionalAttrs.AdditionalAttrs(&LogDetails{
+							Request:            r,
+							RequestBody:        reqBody.String(),
+							RequestBytesUnread: reqUnreadBytes,
+							ResponseStatus:     statusCode,
+							ResponseBytes:      ww.BytesWritten(),
+						})...)
+					}
+				} else if o.LogExtraAttrs != nil {
 					logAttrs = appendAttrs(logAttrs, o.LogExtraAttrs(r, reqBody.String(), statusCode)...)
 				}
 				logAttrs = appendAttrs(logAttrs, getAttrs(ctx)...)
