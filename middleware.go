@@ -36,7 +36,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), ctxKeyLogAttrs{}, &[]slog.Attr{})
+			ctx := context.WithValue(r.Context(), ctxKeyLogAttrs{}, &logData{})
 
 			logReqBody := o.LogRequestBody != nil && o.LogRequestBody(r)
 			logRespBody := o.LogResponseBody != nil && o.LogResponseBody(r)
@@ -56,6 +56,9 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 			start := time.Now()
 
 			defer func() {
+				lockData(ctx)
+				defer unlockData(ctx)
+
 				var logAttrs []slog.Attr
 
 				if rec := recover(); rec != nil {
