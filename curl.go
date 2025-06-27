@@ -44,3 +44,10 @@ func scheme(r *http.Request) string {
 func requestURL(r *http.Request) string {
 	return fmt.Sprintf("%s://%s%s", scheme(r), r.Host, r.URL)
 }
+
+func bytesRead(r *countingReader) int64 {
+	if r == nil {
+		return 0
+	}
+	return r.bytesRead
+}

@@ -41,8 +41,16 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 			logReqBody := o.LogRequestBody != nil && o.LogRequestBody(r)
 			logRespBody := o.LogResponseBody != nil && o.LogResponseBody(r)
 
+			hasReqBody := r.Body != nil && r.Body != http.NoBody
+			var bodyReader *countingReader
+			if hasReqBody {
+				bodyReader = &countingReader{reader: r.Body}
+				r.Body = bodyReader
+			}
+
+			consumeBody := hasReqBody && (logReqBody || o.LogExtraAttrs != nil)
 			var reqBody bytes.Buffer
-			if logReqBody || o.LogExtraAttrs != nil {
+			if consumeBody {
 				r.Body = io.NopCloser(io.TeeReader(r.Body, &reqBody))
 			}
 
@@ -130,6 +138,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					slog.String(s.RequestProto, r.Proto),
 					slog.Any(s.RequestHeaders, slog.GroupValue(getHeaderAttrs(r.Header, o.LogRequestHeaders)...)),
 					slog.Int64(s.RequestBytes, r.ContentLength),
+					slog.Int64(s.RequestBytesRead, bytesRead(bodyReader)),
 					slog.String(s.RequestUserAgent, r.UserAgent()),
 					slog.String(s.RequestReferer, r.Referer()),
 					slog.Any(s.ResponseHeaders, slog.GroupValue(getHeaderAttrs(ww.Header(), o.LogResponseHeaders)...)),
@@ -142,7 +151,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					logAttrs = appendAttrs(logAttrs, slog.Any(ErrorKey, ErrClientAborted), slog.String(s.ErrorType, "ClientAborted"))
 				}
 
-				if logReqBody || o.LogExtraAttrs != nil {
+				if consumeBody {
 					// Ensure the request body is fully read if the underlying HTTP handler didn't do so.
 					n, _ := io.Copy(io.Discard, r.Body)
 					if n > 0 {
@@ -230,4 +239,19 @@ func logBody(body *bytes.Buffer, header http.Header, o *Options) string {
 		}
 	}
 	return fmt.Sprintf("[body redacted for Content-Type: %s]", contentType)
+}
+
+type countingReader struct {
+	reader    io.ReadCloser
+	bytesRead int64
+}
+
+func (cr *countingReader) Read(p []byte) (int, error) {
+	n, err := cr.reader.Read(p)
+	cr.bytesRead += int64(n)
+	return n, err
+}
+
+func (cr *countingReader) Close() error {
+	return cr.reader.Close()
 }
