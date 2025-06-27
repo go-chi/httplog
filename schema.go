@@ -239,7 +239,6 @@ func (s *Schema) Concise(concise bool) *Schema {
 		ErrorStackTrace:    s.ErrorStackTrace,
 		RequestHeaders:     s.RequestHeaders,
 		RequestBody:        s.RequestBody,
-		RequestBytesRead:   s.RequestBytesRead,
 		RequestBytesUnread: s.RequestBytesUnread,
 		ResponseHeaders:    s.ResponseHeaders,
 		ResponseBody:       s.ResponseBody,
