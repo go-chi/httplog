@@ -6,6 +6,12 @@ import (
 	"time"
 )
 
+const (
+	ECSResponseDuration  = "event.duration"
+	OTELResponseDuration = "http.server.request.duration"
+	GCPResponseDuration  = "httpRequest:latency"
+)
+
 // Schema defines the mapping of semantic log fields to their corresponding
 // field names in different logging systems and standards.
 //
@@ -84,7 +90,7 @@ var (
 		ResponseHeaders:    "http.response.headers",
 		ResponseBody:       "http.response.body.content",
 		ResponseStatus:     "http.response.status_code",
-		ResponseDuration:   "event.duration",
+		ResponseDuration:   ECSResponseDuration,
 		ResponseBytes:      "http.response.body.bytes",
 	}
 
@@ -118,7 +124,7 @@ var (
 		ResponseHeaders:    "http.response.header",
 		ResponseBody:       "http.response.body.content",
 		ResponseStatus:     "http.response.status_code",
-		ResponseDuration:   "http.server.request.duration",
+		ResponseDuration:   OTELResponseDuration,
 		ResponseBytes:      "http.response.body.size",
 	}
 
@@ -154,7 +160,7 @@ var (
 		ResponseHeaders:    "httpRequest:responseHeaders",
 		ResponseBody:       "httpRequest:responseBody",
 		ResponseStatus:     "httpRequest:status",
-		ResponseDuration:   "httpRequest:latency",
+		ResponseDuration:   GCPResponseDuration,
 		ResponseBytes:      "httpRequest:responseSize",
 		GroupDelimiter:     ":",
 	}

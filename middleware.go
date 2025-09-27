@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -134,7 +135,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					slog.String(s.RequestReferer, r.Referer()),
 					slog.Any(s.ResponseHeaders, slog.GroupValue(getHeaderAttrs(ww.Header(), o.LogResponseHeaders)...)),
 					slog.Int(s.ResponseStatus, statusCode),
-					slog.Float64(s.ResponseDuration, float64(duration.Milliseconds())),
+					responseDuration(s.ResponseDuration, duration),
 					slog.Int(s.ResponseBytes, ww.BytesWritten()),
 				)
 
@@ -171,6 +172,22 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 
 			next.ServeHTTP(ww, r.WithContext(ctx))
 		})
+	}
+}
+
+func responseDuration(key string, duration time.Duration) slog.Attr {
+	switch key {
+	case ECSResponseDuration:
+		// https://www.elastic.co/docs/reference/ecs/ecs-event#field-event-duration
+		return slog.Int64(key, duration.Nanoseconds())
+	case OTELResponseDuration:
+		// https://opentelemetry.io/docs/specs/semconv/http/http-metrics/#metric-httpserverrequestduration
+		return slog.Float64(key, duration.Seconds())
+	case GCPResponseDuration:
+		// https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#HttpRequest.FIELDS.latency
+		return slog.String(key, strconv.FormatFloat(duration.Seconds(), 'f', -1, 64)+"s")
+	default:
+		return slog.Float64(key, float64(duration.Milliseconds()))
 	}
 }
 
