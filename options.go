@@ -1,6 +1,9 @@
 package httplog
 
 import (
+	"fmt"
+	"time"
+
 	"log/slog"
 	"net/http"
 )
@@ -95,6 +98,10 @@ type Options struct {
 	//
 	// WARNING: Be careful not to leak any sensitive information in the logs.
 	LogExtraAttrs func(req *http.Request, reqBody string, respStatus int) []slog.Attr
+
+	// LogFormat is a optional function that lets you control the format of the log message
+	// If not provided, default format will be used
+	LogFormat func(*http.Request, int, time.Duration) string
 }
 
 var defaultOptions = Options{
@@ -105,4 +112,9 @@ var defaultOptions = Options{
 	LogResponseHeaders:  []string{"Content-Type"},
 	LogBodyContentTypes: []string{"application/json", "application/xml", "text/plain", "text/csv", "application/x-www-form-urlencoded", ""},
 	LogBodyMaxLen:       1024,
+	LogFormat:           defaultLogFormat,
+}
+
+func defaultLogFormat(r *http.Request, statusCode int, duration time.Duration) string {
+	return fmt.Sprintf("%s %s => HTTP %v (%v)", r.Method, r.URL, statusCode, duration)
 }
