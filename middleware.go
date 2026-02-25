@@ -34,6 +34,11 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 		s = SchemaECS
 	}
 
+	logFormat := o.LogFormat
+	if logFormat == nil {
+		logFormat = defaultLogFormat
+	}
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := context.WithValue(r.Context(), ctxKeyLogAttrs{}, &[]slog.Attr{})
@@ -159,9 +164,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					logAttrs = groupAttrs(logAttrs, s.GroupDelimiter)
 				}
 
-				// Concatenation beats fmt.Sprintf 2x on this every-request path.
-				// e.g. "GET /api/users?q=1 => HTTP 200 (1.234567ms)"
-				msg := r.Method + " " + r.URL.String() + " => HTTP " + strconv.Itoa(statusCode) + " (" + duration.String() + ")"
+				msg := logFormat(r, statusCode, duration)
 				logger.LogAttrs(ctx, lvl, msg, logAttrs...)
 			}()
 
