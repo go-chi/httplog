@@ -35,6 +35,11 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 		s = SchemaECS
 	}
 
+	logFormat := o.LogFormat
+	if logFormat == nil {
+		logFormat = defaultLogFormat
+	}
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := context.WithValue(r.Context(), ctxKeyLogAttrs{}, &[]slog.Attr{})
@@ -166,7 +171,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					logAttrs = groupAttrs(logAttrs, s.GroupDelimiter)
 				}
 
-				msg := fmt.Sprintf("%s %s => HTTP %v (%v)", r.Method, r.URL, statusCode, duration)
+				msg := logFormat(r, statusCode, duration)
 				logger.LogAttrs(ctx, lvl, msg, logAttrs...)
 			}()
 
