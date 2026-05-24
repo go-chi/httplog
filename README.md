@@ -63,7 +63,7 @@ func main() {
 		Level: slog.LevelInfo,
 
 		// Set log output to Elastic Common Schema (ECS) format.
-		Schema: httplog.SchemaECS,
+		Schema: logFormat,
 
 		// RecoverPanics recovers from panics occurring in the underlying HTTP handlers
 		// and middlewares. It returns HTTP 500 unless response status was already set.
