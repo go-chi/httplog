@@ -2,6 +2,7 @@ package httplog
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -16,9 +17,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-var (
-	ErrClientAborted = fmt.Errorf("request aborted: client disconnected before response was sent")
-)
+var ErrClientAborted = fmt.Errorf("request aborted: client disconnected before response was sent")
 
 func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Handler {
 	if o == nil {
@@ -125,7 +124,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					slog.String(s.RequestURL, requestURL(r)),
 					slog.String(s.RequestMethod, r.Method),
 					slog.String(s.RequestPath, r.URL.Path),
-					slog.String(s.RequestRemoteIP, r.RemoteAddr),
+					slog.String(s.RequestRemoteIP, cmp.Or(middleware.GetClientIP(ctx), r.RemoteAddr)),
 					slog.String(s.RequestHost, r.Host),
 					slog.String(s.RequestScheme, scheme(r)),
 					slog.String(s.RequestProto, r.Proto),
@@ -202,7 +201,7 @@ func appendAttrs(attrs []slog.Attr, newAttrs ...slog.Attr) []slog.Attr {
 
 func groupAttrs(attrs []slog.Attr, delimiter string) []slog.Attr {
 	var result []slog.Attr
-	var nested = map[string][]slog.Attr{}
+	nested := map[string][]slog.Attr{}
 
 	for _, attr := range attrs {
 		prefix, key, found := strings.Cut(attr.Key, delimiter)
