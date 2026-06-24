@@ -78,13 +78,24 @@ func main() {
 		LogResponseBody: isDebugHeaderSet,
 
 		// Log all requests with invalid payload as curl command.
-		LogExtraAttrs: func(req *http.Request, reqBody string, respStatus int) []slog.Attr {
-			if respStatus == 400 || respStatus == 422 {
-				req.Header.Del("Authorization")
-				return []slog.Attr{slog.String("curl", httplog.CURL(req, reqBody))}
-			}
-			return nil
+		LogAdditionalAttrs: &httplog.LogAdditionalAttrsOptions{
+			IncludeRequestBody: isAdditionalAttrsDebugHeaderSet,
+			AdditionalAttrs: func(ld *httplog.LogDetails) []slog.Attr {
+				if ld.ResponseStatus == 400 || ld.ResponseStatus == 422 {
+					ld.Request.Header.Del("Authorization")
+					return []slog.Attr{slog.String("curl", httplog.CURL(ld.Request, ld.RequestBody))}
+				}
+				return nil
+			},
 		},
+		// Deprecated: LogExtraAttrs is deprecated, use LogAdditionalAttrs instead.
+		// LogExtraAttrs: func(req *http.Request, reqBody string, respStatus int) []slog.Attr {
+		// 	if respStatus == 400 || respStatus == 422 {
+		// 		req.Header.Del("Authorization")
+		// 		return []slog.Attr{slog.String("curl", httplog.CURL(req, reqBody))}
+		// 	}
+		// 	return nil
+		// },
 	}))
 
 	// Set request log attribute from within middleware.
@@ -190,6 +201,7 @@ func main() {
 	fmt.Println(`  curl -v http://localhost:8000/string/to/upper -X POST --json '{"data": "valid payload"}'`)
 	fmt.Println(`  curl -v http://localhost:8000/string/to/upper -X POST --json '{"data": "valid payload"}' -H "Debug: reveal-body-logs"`)
 	fmt.Println(`  curl -v http://localhost:8000/string/to/upper -X POST --json '{"xx": "invalid payload"}'`)
+	fmt.Println(`  curl -v http://localhost:8000/string/to/upper -X POST --json '{"xx": "invalid payload"}' -H "AdditionalAttrsDebug: reveal-body-logs"`)
 	fmt.Println()
 
 	if err := http.ListenAndServe("localhost:8000", r); err != http.ErrAbortHandler {
@@ -216,4 +228,8 @@ func logHandler(isLocalhost bool, handlerOpts *slog.HandlerOptions) slog.Handler
 
 func isDebugHeaderSet(r *http.Request) bool {
 	return r.Header.Get("Debug") == "reveal-body-logs"
+}
+
+func isAdditionalAttrsDebugHeaderSet(r *http.Request) bool {
+	return r.Header.Get("AdditionalAttrsDebug") == "reveal-body-logs"
 }
