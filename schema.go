@@ -43,6 +43,7 @@ type Schema struct {
 	RequestHeaders     string // Selected request headers
 	RequestBody        string // Request body content, if logged.
 	RequestBytes       string // Size of request body in bytes
+	RequestBytesRead   string // Read bytes in request body
 	RequestBytesUnread string // Unread bytes in request body
 	RequestUserAgent   string // User-Agent header value
 	RequestReferer     string // Referer header value
@@ -84,6 +85,7 @@ var (
 		RequestHeaders:     "http.request.headers",
 		RequestBody:        "http.request.body.content",
 		RequestBytes:       "http.request.body.bytes",
+		RequestBytesRead:   "http.request.body.read.bytes",
 		RequestBytesUnread: "http.request.body.unread.bytes",
 		RequestUserAgent:   "user_agent.original",
 		RequestReferer:     "http.request.referrer",
@@ -118,6 +120,7 @@ var (
 		RequestHeaders:     "http.request.header",
 		RequestBody:        "http.request.body.content",
 		RequestBytes:       "http.request.body.size",
+		RequestBytesRead:   "http.request.body.read.size",
 		RequestBytesUnread: "http.request.body.unread.size",
 		RequestUserAgent:   "user_agent.original",
 		RequestReferer:     "http.request.header.referer",
@@ -154,6 +157,7 @@ var (
 		RequestHeaders:     "httpRequest:requestHeaders",
 		RequestBody:        "httpRequest:requestBody",
 		RequestBytes:       "httpRequest:requestSize",
+		RequestBytesRead:   "httpRequest:requestReadSize",
 		RequestBytesUnread: "httpRequest:requestUnreadSize",
 		RequestUserAgent:   "httpRequest:userAgent",
 		RequestReferer:     "httpRequest:referer",
