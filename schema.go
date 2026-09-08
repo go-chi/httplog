@@ -10,6 +10,8 @@ const (
 	ECSResponseDuration  = "event.duration"
 	OTELResponseDuration = "http.server.request.duration"
 	GCPResponseDuration  = "httpRequest:latency"
+
+	GCPLevel = "severity"
 )
 
 // Schema defines the mapping of semantic log fields to their corresponding
@@ -105,9 +107,9 @@ var (
 		ErrorMessage:       "error.message",
 		ErrorType:          "error.type",
 		ErrorStackTrace:    "exception.stacktrace",
-		SourceFile:         "code.filepath",
-		SourceLine:         "code.lineno",
-		SourceFunction:     "code.function",
+		SourceFile:         "code.file.path",
+		SourceLine:         "code.line.number",
+		SourceFunction:     "code.function.name",
 		RequestURL:         "url.full",
 		RequestMethod:      "http.request.method",
 		RequestPath:        "url.path",
@@ -134,9 +136,11 @@ var (
 	// References:
 	//   - https://cloud.google.com/logging/docs/structured-logging
 	//   - https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#HttpRequest
+	// Fields not defined by LogEntry#HttpRequest live at the top level of jsonPayload:
+	// the Logging API rejects the whole entry on unknown httpRequest subfields.
 	SchemaGCP = &Schema{
-		Timestamp:          "timestamp",
-		Level:              "severity",
+		Timestamp:          "time",
+		Level:              GCPLevel,
 		Message:            "message",
 		ErrorMessage:       "error",
 		ErrorType:          "error_type",
@@ -146,19 +150,19 @@ var (
 		SourceFunction:     "logging.googleapis.com/sourceLocation:function",
 		RequestURL:         "httpRequest:requestUrl",
 		RequestMethod:      "httpRequest:requestMethod",
-		RequestPath:        "httpRequest:requestPath",
+		RequestPath:        "requestPath",
 		RequestRemoteIP:    "httpRequest:remoteIp",
-		RequestHost:        "httpRequest:host",
-		RequestScheme:      "httpRequest:scheme",
+		RequestHost:        "host",
+		RequestScheme:      "scheme",
 		RequestProto:       "httpRequest:protocol",
-		RequestHeaders:     "httpRequest:requestHeaders",
-		RequestBody:        "httpRequest:requestBody",
+		RequestHeaders:     "requestHeaders",
+		RequestBody:        "requestBody",
 		RequestBytes:       "httpRequest:requestSize",
-		RequestBytesUnread: "httpRequest:requestUnreadSize",
+		RequestBytesUnread: "requestUnreadSize",
 		RequestUserAgent:   "httpRequest:userAgent",
 		RequestReferer:     "httpRequest:referer",
-		ResponseHeaders:    "httpRequest:responseHeaders",
-		ResponseBody:       "httpRequest:responseBody",
+		ResponseHeaders:    "responseHeaders",
+		ResponseBody:       "responseBody",
 		ResponseStatus:     "httpRequest:status",
 		ResponseDuration:   GCPResponseDuration,
 		ResponseBytes:      "httpRequest:responseSize",
@@ -177,10 +181,15 @@ func (s *Schema) ReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 		if s.Timestamp == "" {
 			return a
 		}
-		return slog.String(s.Timestamp, a.Value.Time().Format(time.RFC3339))
+		return slog.String(s.Timestamp, a.Value.Time().Format(time.RFC3339Nano))
 	case slog.LevelKey:
 		if s.Level == "" {
 			return a
+		}
+		if s.Level == GCPLevel {
+			if lvl, ok := a.Value.Any().(slog.Level); ok {
+				return slog.String(s.Level, gcpLogSeverity(lvl))
+			}
 		}
 		return slog.String(s.Level, a.Value.String())
 	case slog.MessageKey:
@@ -225,6 +234,22 @@ func (s *Schema) ReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 	}
 
 	return a
+}
+
+// gcpLogSeverity maps slog levels to GCP LogSeverity values, which have no "WARN".
+//
+// Reference: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#LogSeverity
+func gcpLogSeverity(level slog.Level) string {
+	switch {
+	case level < slog.LevelInfo:
+		return "DEBUG"
+	case level < slog.LevelWarn:
+		return "INFO"
+	case level < slog.LevelError:
+		return "WARNING"
+	default:
+		return "ERROR"
+	}
 }
 
 // Concise returns a simplified schema with essential fields only.
