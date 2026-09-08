@@ -9,7 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"runtime/debug"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -74,7 +74,10 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					if rec != http.ErrAbortHandler {
 						// Go panic format: a single string parseable by GCP Error Reporting,
 						// matching the string type of ECS/OTEL stack trace fields.
-						stackTrace := fmt.Sprintf("panic: %v\n\n%s", rec, debug.Stack())
+						// Single fixed-buffer stack walk; debug.Stack() re-walks on every buffer grow.
+						buf := make([]byte, 16<<10)
+						n := runtime.Stack(buf, false)
+						stackTrace := fmt.Sprintf("panic: %v\n\n%s", rec, buf[:n])
 						logAttrs = appendAttrs(logAttrs, slog.String(s.ErrorStackTrace, stackTrace))
 					}
 				}
