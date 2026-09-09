@@ -72,19 +72,13 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					logAttrs = appendAttrs(logAttrs, slog.String(s.ErrorMessage, fmt.Sprintf("panic: %v", rec)))
 
 					if rec != http.ErrAbortHandler {
-						pc := make([]uintptr, 10)   // Capture up to 10 stack frames.
-						n := runtime.Callers(3, pc) // Skip 3 frames (this middleware + runtime/panic.go).
-						pc = pc[:n]
-
-						// Process panic stack frames to print detailed information.
-						frames := runtime.CallersFrames(pc)
-						var stackValues []string
-						for frame, more := frames.Next(); more; frame, more = frames.Next() {
-							if !strings.Contains(frame.File, "runtime/panic.go") {
-								stackValues = append(stackValues, fmt.Sprintf("%s:%d", frame.File, frame.Line))
-							}
-						}
-						logAttrs = appendAttrs(logAttrs, slog.Any(s.ErrorStackTrace, stackValues))
+						// Go panic format: a single string parseable by GCP Error Reporting,
+						// matching the string type of ECS/OTEL stack trace fields.
+						// Single fixed-buffer stack walk; debug.Stack() re-walks on every buffer grow.
+						buf := make([]byte, 16<<10)
+						n := runtime.Stack(buf, false)
+						stackTrace := fmt.Sprintf("panic: %v\n\n%s", rec, buf[:n])
+						logAttrs = appendAttrs(logAttrs, slog.String(s.ErrorStackTrace, stackTrace))
 					}
 				}
 

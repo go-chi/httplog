@@ -10,6 +10,8 @@ const (
 	ECSResponseDuration  = "event.duration"
 	OTELResponseDuration = "http.server.request.duration"
 	GCPResponseDuration  = "httpRequest:latency"
+
+	GCPLevel = "severity"
 )
 
 // Schema defines the mapping of semantic log fields to their corresponding
@@ -63,105 +65,111 @@ var (
 	// SchemaECS represents the Elastic Common Schema (ECS) version 9.0.0.
 	// This schema is widely used with Elasticsearch and the Elastic Stack.
 	//
-	// Reference: https://www.elastic.co/guide/en/ecs/current/ecs-http.html
+	// Reference: https://www.elastic.co/docs/reference/ecs/ecs-field-reference
 	SchemaECS = &Schema{
-		Timestamp:          "@timestamp",
-		Level:              "log.level",
-		Message:            "message",
-		ErrorMessage:       "error.message",
-		ErrorType:          "error.type",
-		ErrorStackTrace:    "error.stack_trace",
-		SourceFile:         "log.origin.file.name",
-		SourceLine:         "log.origin.file.line",
-		SourceFunction:     "log.origin.function",
-		RequestURL:         "url.full",
-		RequestMethod:      "http.request.method",
-		RequestPath:        "url.path",
-		RequestRemoteIP:    "client.ip",
-		RequestHost:        "url.domain",
-		RequestScheme:      "url.scheme",
-		RequestProto:       "http.version",
-		RequestHeaders:     "http.request.headers",
-		RequestBody:        "http.request.body.content",
-		RequestBytes:       "http.request.body.bytes",
-		RequestBytesUnread: "http.request.body.unread.bytes",
-		RequestUserAgent:   "user_agent.original",
-		RequestReferer:     "http.request.referrer",
-		ResponseHeaders:    "http.response.headers",
-		ResponseBody:       "http.response.body.content",
-		ResponseStatus:     "http.response.status_code",
-		ResponseDuration:   ECSResponseDuration,
-		ResponseBytes:      "http.response.body.bytes",
+		Timestamp:          "@timestamp",                     // https://www.elastic.co/docs/reference/ecs/ecs-base#field-timestamp
+		Level:              "log.level",                      // https://www.elastic.co/docs/reference/ecs/ecs-log#field-log-level
+		Message:            "message",                        // https://www.elastic.co/docs/reference/ecs/ecs-base#field-message
+		ErrorMessage:       "error.message",                  // https://www.elastic.co/docs/reference/ecs/ecs-error#field-error-message
+		ErrorType:          "error.type",                     // https://www.elastic.co/docs/reference/ecs/ecs-error#field-error-type
+		ErrorStackTrace:    "error.stack_trace",              // https://www.elastic.co/docs/reference/ecs/ecs-error#field-error-stack-trace
+		SourceFile:         "log.origin.file.name",           // https://www.elastic.co/docs/reference/ecs/ecs-log#field-log-origin-file-name
+		SourceLine:         "log.origin.file.line",           // https://www.elastic.co/docs/reference/ecs/ecs-log#field-log-origin-file-line
+		SourceFunction:     "log.origin.function",            // https://www.elastic.co/docs/reference/ecs/ecs-log#field-log-origin-function
+		RequestURL:         "url.full",                       // https://www.elastic.co/docs/reference/ecs/ecs-url#field-url-full
+		RequestMethod:      "http.request.method",            // https://www.elastic.co/docs/reference/ecs/ecs-http#field-http-request-method
+		RequestPath:        "url.path",                       // https://www.elastic.co/docs/reference/ecs/ecs-url#field-url-path
+		RequestRemoteIP:    "client.ip",                      // https://www.elastic.co/docs/reference/ecs/ecs-client#field-client-ip
+		RequestHost:        "url.domain",                     // https://www.elastic.co/docs/reference/ecs/ecs-url#field-url-domain
+		RequestScheme:      "url.scheme",                     // https://www.elastic.co/docs/reference/ecs/ecs-url#field-url-scheme
+		RequestProto:       "http.version",                   // https://www.elastic.co/docs/reference/ecs/ecs-http#field-http-version
+		RequestHeaders:     "http.request.headers",           // Custom field; ECS 9.0.0 defines no header fields.
+		RequestBody:        "http.request.body.content",      // https://www.elastic.co/docs/reference/ecs/ecs-http#field-http-request-body-content
+		RequestBytes:       "http.request.body.bytes",        // https://www.elastic.co/docs/reference/ecs/ecs-http#field-http-request-body-bytes
+		RequestBytesUnread: "http.request.body.unread.bytes", // Custom field; not part of ECS 9.0.0.
+		RequestUserAgent:   "user_agent.original",            // https://www.elastic.co/docs/reference/ecs/ecs-user_agent#field-user-agent-original
+		RequestReferer:     "http.request.referrer",          // https://www.elastic.co/docs/reference/ecs/ecs-http#field-http-request-referrer
+		ResponseHeaders:    "http.response.headers",          // Custom field; ECS 9.0.0 defines no header fields.
+		ResponseBody:       "http.response.body.content",     // https://www.elastic.co/docs/reference/ecs/ecs-http#field-http-response-body-content
+		ResponseStatus:     "http.response.status_code",      // https://www.elastic.co/docs/reference/ecs/ecs-http#field-http-response-status-code
+		ResponseDuration:   ECSResponseDuration,              // https://www.elastic.co/docs/reference/ecs/ecs-event#field-event-duration
+		ResponseBytes:      "http.response.body.bytes",       // https://www.elastic.co/docs/reference/ecs/ecs-http#field-http-response-body-bytes
 	}
 
 	// SchemaOTEL represents OpenTelemetry (OTEL) semantic conventions version 1.34.0.
 	// This schema follows OpenTelemetry standards for observability data.
 	//
-	// Reference: https://opentelemetry.io/docs/specs/semconv/http/http-metrics
+	// References:
+	//   - https://github.com/open-telemetry/semantic-conventions/tree/v1.34.0/docs/registry/attributes
+	//   - https://opentelemetry.io/docs/specs/otel/logs/data-model/ (timestamp, severity_text, body)
 	SchemaOTEL = &Schema{
-		Timestamp:          "timestamp",
-		Level:              "severity_text",
-		Message:            "body",
-		ErrorMessage:       "error.message",
-		ErrorType:          "error.type",
-		ErrorStackTrace:    "exception.stacktrace",
-		SourceFile:         "code.filepath",
-		SourceLine:         "code.lineno",
-		SourceFunction:     "code.function",
-		RequestURL:         "url.full",
-		RequestMethod:      "http.request.method",
-		RequestPath:        "url.path",
-		RequestRemoteIP:    "client.address",
-		RequestHost:        "server.address",
-		RequestScheme:      "url.scheme",
-		RequestProto:       "network.protocol.version",
-		RequestHeaders:     "http.request.header",
-		RequestBody:        "http.request.body.content",
-		RequestBytes:       "http.request.body.size",
-		RequestBytesUnread: "http.request.body.unread.size",
-		RequestUserAgent:   "user_agent.original",
-		RequestReferer:     "http.request.header.referer",
-		ResponseHeaders:    "http.response.header",
-		ResponseBody:       "http.response.body.content",
-		ResponseStatus:     "http.response.status_code",
-		ResponseDuration:   OTELResponseDuration,
-		ResponseBytes:      "http.response.body.size",
+		Timestamp:          "timestamp",                     // Log record field: https://opentelemetry.io/docs/specs/otel/logs/data-model/#field-timestamp
+		Level:              "severity_text",                 // Log record field: https://opentelemetry.io/docs/specs/otel/logs/data-model/#field-severitytext
+		Message:            "body",                          // Log record field: https://opentelemetry.io/docs/specs/otel/logs/data-model/#field-body
+		ErrorMessage:       "error.message",                 // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/error.md
+		ErrorType:          "error.type",                    // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/error.md
+		ErrorStackTrace:    "exception.stacktrace",          // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/exception.md
+		SourceFile:         "code.file.path",                // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/code.md
+		SourceLine:         "code.line.number",              // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/code.md
+		SourceFunction:     "code.function.name",            // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/code.md
+		RequestURL:         "url.full",                      // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/url.md
+		RequestMethod:      "http.request.method",           // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/http.md
+		RequestPath:        "url.path",                      // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/url.md
+		RequestRemoteIP:    "client.address",                // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/client.md
+		RequestHost:        "server.address",                // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/server.md
+		RequestScheme:      "url.scheme",                    // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/url.md
+		RequestProto:       "network.protocol.version",      // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/network.md
+		RequestHeaders:     "http.request.header",           // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/http.md
+		RequestBody:        "http.request.body.content",     // Custom field (ECS name); OTEL semconv defines no body content attribute.
+		RequestBytes:       "http.request.body.size",        // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/http.md
+		RequestBytesUnread: "http.request.body.unread.size", // Custom field; not part of OTEL semconv.
+		RequestUserAgent:   "user_agent.original",           // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/user-agent.md
+		RequestReferer:     "http.request.header.referer",   // Templated header attribute: https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/http.md
+		ResponseHeaders:    "http.response.header",          // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/http.md
+		ResponseBody:       "http.response.body.content",    // Custom field (ECS name); OTEL semconv defines no body content attribute.
+		ResponseStatus:     "http.response.status_code",     // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/http.md
+		ResponseDuration:   OTELResponseDuration,            // Metric name reused as a log attribute: https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/http/http-metrics.md#metric-httpserverrequestduration
+		ResponseBytes:      "http.response.body.size",       // https://github.com/open-telemetry/semantic-conventions/blob/v1.34.0/docs/registry/attributes/http.md
 	}
 
 	// SchemaGCP represents Google Cloud Platform's structured logging format.
 	// This schema is optimized for Google Cloud Logging service.
 	//
 	// References:
-	//   - https://cloud.google.com/logging/docs/structured-logging
+	//   - https://cloud.google.com/logging/docs/structured-logging#special-payload-fields
 	//   - https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#HttpRequest
+	//   - https://cloud.google.com/error-reporting/docs/formatting-error-messages
+	//
+	// Fields not defined by LogEntry#HttpRequest live at the top level of jsonPayload:
+	// the Logging API rejects the whole entry on unknown httpRequest subfields.
 	SchemaGCP = &Schema{
-		Timestamp:          "timestamp",
-		Level:              "severity",
-		Message:            "message",
-		ErrorMessage:       "error",
-		ErrorType:          "error_type",
-		ErrorStackTrace:    "stack_trace",
-		SourceFile:         "logging.googleapis.com/sourceLocation:file",
-		SourceLine:         "logging.googleapis.com/sourceLocation:line",
-		SourceFunction:     "logging.googleapis.com/sourceLocation:function",
-		RequestURL:         "httpRequest:requestUrl",
-		RequestMethod:      "httpRequest:requestMethod",
-		RequestPath:        "httpRequest:requestPath",
-		RequestRemoteIP:    "httpRequest:remoteIp",
-		RequestHost:        "httpRequest:host",
-		RequestScheme:      "httpRequest:scheme",
-		RequestProto:       "httpRequest:protocol",
-		RequestHeaders:     "httpRequest:requestHeaders",
-		RequestBody:        "httpRequest:requestBody",
-		RequestBytes:       "httpRequest:requestSize",
-		RequestBytesUnread: "httpRequest:requestUnreadSize",
-		RequestUserAgent:   "httpRequest:userAgent",
-		RequestReferer:     "httpRequest:referer",
-		ResponseHeaders:    "httpRequest:responseHeaders",
-		ResponseBody:       "httpRequest:responseBody",
-		ResponseStatus:     "httpRequest:status",
-		ResponseDuration:   GCPResponseDuration,
-		ResponseBytes:      "httpRequest:responseSize",
+		Timestamp:          "time",                                           // https://cloud.google.com/logging/docs/structured-logging#special-payload-fields
+		Level:              GCPLevel,                                         // https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#LogSeverity
+		Message:            "message",                                        // https://cloud.google.com/logging/docs/structured-logging#special-payload-fields
+		ErrorMessage:       "error",                                          // Custom jsonPayload field; Error Reporting reads stack_trace/message instead.
+		ErrorType:          "error_type",                                     // Custom jsonPayload field.
+		ErrorStackTrace:    "stack_trace",                                    // https://cloud.google.com/error-reporting/docs/formatting-error-messages
+		SourceFile:         "logging.googleapis.com/sourceLocation:file",     // https://cloud.google.com/logging/docs/structured-logging#special-payload-fields
+		SourceLine:         "logging.googleapis.com/sourceLocation:line",     // https://cloud.google.com/logging/docs/structured-logging#special-payload-fields
+		SourceFunction:     "logging.googleapis.com/sourceLocation:function", // https://cloud.google.com/logging/docs/structured-logging#special-payload-fields
+		RequestURL:         "httpRequest:requestUrl",                         // https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#HttpRequest
+		RequestMethod:      "httpRequest:requestMethod",                      // https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#HttpRequest
+		RequestPath:        "requestPath",                                    // Custom jsonPayload field; not part of LogEntry#HttpRequest.
+		RequestRemoteIP:    "httpRequest:remoteIp",                           // https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#HttpRequest
+		RequestHost:        "host",                                           // Custom jsonPayload field; not part of LogEntry#HttpRequest.
+		RequestScheme:      "scheme",                                         // Custom jsonPayload field; not part of LogEntry#HttpRequest.
+		RequestProto:       "httpRequest:protocol",                           // https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#HttpRequest
+		RequestHeaders:     "requestHeaders",                                 // Custom jsonPayload field; not part of LogEntry#HttpRequest.
+		RequestBody:        "requestBody",                                    // Custom jsonPayload field; not part of LogEntry#HttpRequest.
+		RequestBytes:       "httpRequest:requestSize",                        // https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#HttpRequest
+		RequestBytesUnread: "requestUnreadSize",                              // Custom jsonPayload field; not part of LogEntry#HttpRequest.
+		RequestUserAgent:   "httpRequest:userAgent",                          // https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#HttpRequest
+		RequestReferer:     "httpRequest:referer",                            // https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#HttpRequest
+		ResponseHeaders:    "responseHeaders",                                // Custom jsonPayload field; not part of LogEntry#HttpRequest.
+		ResponseBody:       "responseBody",                                   // Custom jsonPayload field; not part of LogEntry#HttpRequest.
+		ResponseStatus:     "httpRequest:status",                             // https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#HttpRequest
+		ResponseDuration:   GCPResponseDuration,                              // https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#HttpRequest.FIELDS.latency
+		ResponseBytes:      "httpRequest:responseSize",                       // https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#HttpRequest
 		GroupDelimiter:     ":",
 	}
 )
@@ -177,10 +185,15 @@ func (s *Schema) ReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 		if s.Timestamp == "" {
 			return a
 		}
-		return slog.String(s.Timestamp, a.Value.Time().Format(time.RFC3339))
+		return slog.String(s.Timestamp, a.Value.Time().Format(time.RFC3339Nano))
 	case slog.LevelKey:
 		if s.Level == "" {
 			return a
+		}
+		if s.Level == GCPLevel {
+			if lvl, ok := a.Value.Any().(slog.Level); ok {
+				return slog.String(s.Level, gcpLogSeverity(lvl))
+			}
 		}
 		return slog.String(s.Level, a.Value.String())
 	case slog.MessageKey:
@@ -225,6 +238,22 @@ func (s *Schema) ReplaceAttr(groups []string, a slog.Attr) slog.Attr {
 	}
 
 	return a
+}
+
+// gcpLogSeverity maps slog levels to GCP LogSeverity values, which have no "WARN".
+//
+// Reference: https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#LogSeverity
+func gcpLogSeverity(level slog.Level) string {
+	switch {
+	case level < slog.LevelInfo:
+		return "DEBUG"
+	case level < slog.LevelWarn:
+		return "INFO"
+	case level < slog.LevelError:
+		return "WARNING"
+	default:
+		return "ERROR"
+	}
 }
 
 // Concise returns a simplified schema with essential fields only.
