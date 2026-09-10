@@ -49,7 +49,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
 			var respBody bytes.Buffer
-			if o.LogResponseBody != nil && o.LogResponseBody(r) {
+			if logRespBody {
 				ww.Tee(&respBody)
 			}
 
