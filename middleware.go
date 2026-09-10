@@ -166,6 +166,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				if o.LogFormat != nil {
 					msg = o.LogFormat(r, &LogFormatArgs{StatusCode: statusCode, Duration: duration, Attrs: logAttrs})
 				} else {
+					// e.g. "GET /api/users?q=1 => HTTP 200 (1.234567ms)"
 					msg = r.Method + " " + r.URL.String() + " => HTTP " + strconv.Itoa(statusCode) + " (" + duration.String() + ")"
 				}
 				logger.LogAttrs(ctx, lvl, msg, logAttrs...)
