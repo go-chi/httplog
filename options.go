@@ -5,6 +5,7 @@ import (
 	"net/http"
 )
 
+// Options defines configuration options for the httplog middleware.
 type Options struct {
 	// Level defines the verbosity of the request logs:
 	// slog.LevelDebug - log both request starts & responses (incl. OPTIONS)
@@ -60,10 +61,10 @@ type Options struct {
 	// If not provided, there are no default headers.
 	LogResponseHeaders []string
 
-	// LogRequestBody is an optional predicate function that controls logging of request body.
+	// LogResponseBody is an optional predicate function that controls logging of response body.
 	//
-	// If the function returns true, the request body will be logged.
-	// If false, no request body will be logged.
+	// If the function returns true, the response body will be logged.
+	// If false, no response body will be logged.
 	//
 	// WARNING: Do not leak any response bodies with sensitive information.
 	LogResponseBody func(req *http.Request) bool
