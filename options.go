@@ -3,6 +3,7 @@ package httplog
 import (
 	"log/slog"
 	"net/http"
+	"time"
 )
 
 // Options defines configuration options for the httplog middleware.
@@ -96,6 +97,24 @@ type Options struct {
 	//
 	// WARNING: Be careful not to leak any sensitive information in the logs.
 	LogExtraAttrs func(req *http.Request, reqBody string, respStatus int) []slog.Attr
+
+	// LogFormat is an optional function that lets you control the format of the
+	// log message, e.g. to return a constant string for easier log aggregation.
+	//
+	// If not provided, the default format is "GET /path => HTTP 200 (1.234ms)".
+	// The default path never invokes a function and adds no allocations.
+	LogFormat func(req *http.Request, args *LogFormatArgs) string
+}
+
+// LogFormatArgs are the arguments passed to the Options.LogFormat function.
+//
+// NOTE: New fields may be added in the future without a breaking change.
+type LogFormatArgs struct {
+	StatusCode int
+	Duration   time.Duration
+
+	// Attrs are the request log attributes, in schema field names. Read-only.
+	Attrs []slog.Attr
 }
 
 var defaultOptions = Options{
