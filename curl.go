@@ -42,5 +42,10 @@ func scheme(r *http.Request) string {
 }
 
 func requestURL(r *http.Request) string {
+	// r.URL is absolute for proxy absolute-form requests (RFC 9112, section 3.2.2);
+	// prepending scheme and host again would duplicate them.
+	if r.URL.IsAbs() {
+		return r.URL.String()
+	}
 	return fmt.Sprintf("%s://%s%s", scheme(r), r.Host, r.URL)
 }
