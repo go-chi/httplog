@@ -232,6 +232,11 @@ func logBody(body *bytes.Buffer, header http.Header, o *Options) string {
 	}
 	contentType := header.Get("Content-Type")
 	for _, whitelisted := range o.LogBodyContentTypes {
+		// An empty entry whitelists only requests with no Content-Type header;
+		// HasPrefix with "" would match everything and make redaction unreachable.
+		if whitelisted == "" && contentType != "" {
+			continue
+		}
 		if strings.HasPrefix(contentType, whitelisted) {
 			if o.LogBodyMaxLen <= 0 || o.LogBodyMaxLen >= body.Len() {
 				return body.String()
