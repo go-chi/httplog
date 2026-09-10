@@ -34,11 +34,6 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 		s = SchemaECS
 	}
 
-	logFormat := o.LogFormat
-	if logFormat == nil {
-		logFormat = defaultLogFormat
-	}
-
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := context.WithValue(r.Context(), ctxKeyLogAttrs{}, &[]slog.Attr{})
@@ -164,7 +159,14 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 					logAttrs = groupAttrs(logAttrs, s.GroupDelimiter)
 				}
 
-				msg := logFormat(r, statusCode, duration)
+				// Format the default message inline: a dynamic function call can't be
+				// inlined and would copy the args on the hot path for no reason.
+				var msg string
+				if o.LogFormat != nil {
+					msg = o.LogFormat(r, &LogFormatArgs{StatusCode: statusCode, Duration: duration, Attrs: logAttrs})
+				} else {
+					msg = fmt.Sprintf("%s %s => HTTP %v (%v)", r.Method, r.URL, statusCode, duration)
+				}
 				logger.LogAttrs(ctx, lvl, msg, logAttrs...)
 			}()
 

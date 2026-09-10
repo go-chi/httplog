@@ -86,8 +86,8 @@ func main() {
 			return nil
 		},
 
-		LogFormat: func(r *http.Request, statusCode int, d time.Duration) string {
-			return fmt.Sprintf("%s %s => HTTP %v", r.Method, r.URL, statusCode)
+		LogFormat: func(r *http.Request, args *httplog.LogFormatArgs) string {
+			return fmt.Sprintf("%s %s => HTTP %v", r.Method, r.URL, args.StatusCode)
 		},
 	}))
 
