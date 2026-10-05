@@ -36,7 +36,7 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), ctxKeyLogAttrs{}, &[]slog.Attr{})
+			ctx := context.WithValue(r.Context(), ctxKeyLogAttrs{}, newLogAttrs())
 
 			logReqBody := o.LogRequestBody != nil && o.LogRequestBody(r)
 			logRespBody := o.LogResponseBody != nil && o.LogResponseBody(r)

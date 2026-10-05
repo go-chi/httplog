@@ -3,6 +3,7 @@ package httplog
 import (
 	"context"
 	"log/slog"
+	"sync"
 )
 
 const (
@@ -15,16 +16,35 @@ func (c *ctxKeyLogAttrs) String() string {
 	return "httplog attrs context"
 }
 
+// logAttrs holds request-scoped log attributes. SetAttrs may be called
+// from multiple goroutines on the same request (e.g. GraphQL subscriptions
+// or fan-out handlers), so the slice is mutex-protected.
+type logAttrs struct {
+	mu    sync.Mutex
+	attrs []slog.Attr
+}
+
+func newLogAttrs() *logAttrs {
+	return &logAttrs{}
+}
+
 // SetAttrs sets the attributes on the request log.
+// It is safe for concurrent use on the same request context.
 func SetAttrs(ctx context.Context, attrs ...slog.Attr) {
-	if ptr, ok := ctx.Value(ctxKeyLogAttrs{}).(*[]slog.Attr); ok && ptr != nil {
-		*ptr = append(*ptr, attrs...)
+	if bag, ok := ctx.Value(ctxKeyLogAttrs{}).(*logAttrs); ok && bag != nil {
+		bag.mu.Lock()
+		bag.attrs = append(bag.attrs, attrs...)
+		bag.mu.Unlock()
 	}
 }
 
 func getAttrs(ctx context.Context) []slog.Attr {
-	if ptr, ok := ctx.Value(ctxKeyLogAttrs{}).(*[]slog.Attr); ok && ptr != nil {
-		return *ptr
+	if bag, ok := ctx.Value(ctxKeyLogAttrs{}).(*logAttrs); ok && bag != nil {
+		bag.mu.Lock()
+		defer bag.mu.Unlock()
+		out := make([]slog.Attr, len(bag.attrs))
+		copy(out, bag.attrs)
+		return out
 	}
 
 	return nil
