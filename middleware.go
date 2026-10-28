@@ -99,7 +99,8 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				switch {
 				case statusCode >= 500:
 					lvl = slog.LevelError
-				case statusCode == 429:
+				case statusCode == 429, statusCode == 499:
+					// Rate limits and client-closed requests are expected client behavior.
 					lvl = slog.LevelInfo
 				case statusCode >= 400:
 					lvl = slog.LevelWarn
