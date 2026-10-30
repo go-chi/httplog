@@ -198,6 +198,7 @@ func TestSchemaGCPSeverity(t *testing.T) {
 		{"GET", okHandler, "INFO"},
 		{"GET", statusHandler(400), "WARNING"},
 		{"GET", statusHandler(429), "INFO"},
+		{"GET", statusHandler(499), "INFO"},
 		{"GET", statusHandler(500), "ERROR"},
 		{"OPTIONS", okHandler, "DEBUG"},
 	}
