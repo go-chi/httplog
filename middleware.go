@@ -85,9 +85,15 @@ func RequestLogger(logger *slog.Logger, o *Options) func(http.Handler) http.Hand
 				duration := time.Since(start)
 				statusCode := ww.Status()
 				if statusCode == 0 {
-					// If the handler never calls w.WriteHeader(statusCode) explicitly,
-					// Go's http package automatically sends HTTP 200 OK to the client.
-					statusCode = 200
+					if errors.Is(ctx.Err(), context.Canceled) {
+						// The client went away before any response was written.
+						// Log HTTP 499 Client Closed Request instead of a phantom HTTP 200.
+						statusCode = 499
+					} else {
+						// If the handler never calls w.WriteHeader(statusCode) explicitly,
+						// Go's http package automatically sends HTTP 200 OK to the client.
+						statusCode = 200
+					}
 				}
 
 				// Skip logging if the request is filtered by the Skip function.
