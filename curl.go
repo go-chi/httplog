@@ -11,13 +11,13 @@ func CURL(req *http.Request, reqBody string) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "curl")
-	if req.Method != "GET" && req.Method != "POST" {
+	if req.Method != "POST" && (req.Method != "GET" || reqBody != "") {
 		fmt.Fprintf(&b, " -X %s", req.Method)
 	}
 
 	fmt.Fprintf(&b, " %s", singleQuoted(requestURL(req)))
 
-	if req.Method == "POST" {
+	if req.Method == "POST" || reqBody != "" {
 		fmt.Fprintf(&b, " --data-raw %s", singleQuoted(reqBody))
 	}
 
